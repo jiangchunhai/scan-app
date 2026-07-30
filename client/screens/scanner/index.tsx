@@ -8,6 +8,8 @@ import {
   Platform,
   ActivityIndicator,
   Linking,
+  Modal,
+  ScrollView,
 } from 'react-native';
 import { CameraView, useCameraPermissions, type BarcodeScanningResult } from 'expo-camera';
 import * as Haptics from 'expo-haptics';
@@ -35,6 +37,9 @@ export default function ScannerScreen() {
   const [isProcessing, setIsProcessing] = useState(false);
   const [stats, setStats] = useState<Stats>({ total: 0, today: 0, success: 0, today_success: 0, failed: 0 });
   const [configReady, setConfigReady] = useState(false);
+  const [tableRecords, setTableRecords] = useState<Array<{ index: number; value: string }>>([]);
+  const [showTableModal, setShowTableModal] = useState(false);
+  const [loadingTable, setLoadingTable] = useState(false);
   const scanLineAnim = useRef(new Animated.Value(0)).current;
   const lastScanTime = useRef(0);
 
@@ -76,6 +81,26 @@ export default function ScannerScreen() {
       }
     } catch {
       // Silently fail
+    }
+  }, []);
+
+  // Fetch table records from Feishu
+  const fetchTableRecords = useCallback(async () => {
+    setLoadingTable(true);
+    try {
+      const response = await fetch(`${process.env.EXPO_PUBLIC_BACKEND_BASE_URL}/api/v1/feishu/table-records`);
+      const result = await response.json() as {
+        success: boolean;
+        data: { field_name: string; total: number; records: Array<{ index: number; value: string }> };
+      };
+      if (result.success) {
+        setTableRecords(result.data.records);
+        setShowTableModal(true);
+      }
+    } catch {
+      // Silently fail
+    } finally {
+      setLoadingTable(false);
     }
   }, []);
 
@@ -288,6 +313,19 @@ export default function ScannerScreen() {
                 <Text style={styles.resultErrorText}>{lastScan.error}</Text>
               )}
             </View>
+
+            {lastScan.status === 'success' && (
+              <TouchableOpacity
+                style={styles.tableLinkButton}
+                onPress={fetchTableRecords}
+                disabled={loadingTable}
+              >
+                <FontAwesome6 name="table-list" size={16} color="#4F46E5" />
+                <Text style={styles.tableLinkText}>
+                  {loadingTable ? '加载中...' : '查看表格数据'}
+                </Text>
+              </TouchableOpacity>
+            )}
           </View>
         )}
 
@@ -327,6 +365,46 @@ export default function ScannerScreen() {
           </TouchableOpacity>
         </View>
       </View>
+
+      {/* Table Records Modal */}
+      <Modal
+        visible={showTableModal}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setShowTableModal(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>飞书表格数据</Text>
+              <TouchableOpacity onPress={() => setShowTableModal(false)}>
+                <FontAwesome6 name="xmark" size={20} color="#6B7280" />
+              </TouchableOpacity>
+            </View>
+            <ScrollView style={styles.modalBody}>
+              {tableRecords.length === 0 ? (
+                <Text style={styles.modalEmptyText}>暂无数据</Text>
+              ) : (
+                tableRecords.map((record) => (
+                  <View key={record.index} style={styles.recordRow}>
+                    <Text style={styles.recordIndex}>{record.index}.</Text>
+                    <Text style={styles.recordValue} selectable>{record.value}</Text>
+                  </View>
+                ))
+              )}
+            </ScrollView>
+            <View style={styles.modalFooter}>
+              <Text style={styles.modalTotal}>共 {tableRecords.length} 条记录</Text>
+              <TouchableOpacity
+                style={styles.modalCloseBtn}
+                onPress={() => setShowTableModal(false)}
+              >
+                <Text style={styles.modalCloseText}>关闭</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </Screen>
   );
 }
@@ -638,5 +716,103 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '600',
     color: '#4F46E5',
+  },
+  tableLinkButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    marginTop: 12,
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+    backgroundColor: 'rgba(79, 70, 229, 0.08)',
+    borderRadius: 12,
+  },
+  tableLinkText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#4F46E5',
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'flex-end',
+  },
+  modalContent: {
+    backgroundColor: '#FFFFFF',
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    maxHeight: '80%',
+    paddingBottom: insets.bottom + 20,
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 20,
+    paddingTop: 20,
+    paddingBottom: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F3F4F6',
+  },
+  modalTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#111827',
+  },
+  modalBody: {
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+    maxHeight: 400,
+  },
+  modalEmptyText: {
+    fontSize: 14,
+    color: '#9CA3AF',
+    textAlign: 'center',
+    paddingVertical: 40,
+  },
+  recordRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F3F4F6',
+  },
+  recordIndex: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#4F46E5',
+    width: 36,
+    flexShrink: 0,
+  },
+  recordValue: {
+    fontSize: 14,
+    color: '#1F2937',
+    flex: 1,
+    fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
+  },
+  modalFooter: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 20,
+    paddingTop: 16,
+    borderTopWidth: 1,
+    borderTopColor: '#F3F4F6',
+  },
+  modalTotal: {
+    fontSize: 13,
+    color: '#9CA3AF',
+  },
+  modalCloseBtn: {
+    paddingHorizontal: 20,
+    paddingVertical: 8,
+    backgroundColor: '#4F46E5',
+    borderRadius: 10,
+  },
+  modalCloseText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#FFFFFF',
   },
 });

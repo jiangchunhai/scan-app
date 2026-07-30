@@ -325,4 +325,83 @@ router.get('/records', async (req: Request, res: Response) => {
   }
 });
 
+/**
+ * GET /api/v1/feishu/table-records
+ * Fetch all records from Feishu Bitable, return field values with numbering
+ * Query: { field_name?: string } (optional, defaults to config field_name)
+ */
+router.get('/table-records', async (req: Request, res: Response) => {
+  try {
+    const client = getSupabaseClient();
+
+    // Get Feishu config
+    const { data: configs, error: configError } = await client
+      .from('feishu_config')
+      .select('id, app_id, app_secret, app_token, table_id, field_name')
+      .order('updated_at', { ascending: false })
+      .limit(1);
+
+    if (configError) throw new Error(`查询配置失败: ${configError.message}`);
+    if (!configs || configs.length === 0) {
+      res.status(400).json({ success: false, error: '未配置飞书凭证' });
+      return;
+    }
+
+    const config = configs[0];
+    const fieldName = (req.query.field_name as string) || config.field_name || '1688订单编号';
+
+    // Get tenant access token
+    const token = await getTenantAccessToken(config.app_id, config.app_secret);
+
+    // Fetch all records from Feishu Bitable with pagination
+    const allItems: Array<Record<string, unknown>> = [];
+    let pageToken = '';
+
+    do {
+      const url = new URL(
+        `https://open.feishu.cn/open-apis/bitable/v1/apps/${config.app_token}/tables/${config.table_id}/records`
+      );
+      url.searchParams.set('page_size', '100');
+      if (pageToken) url.searchParams.set('page_token', pageToken);
+
+      const response = await fetch(url.toString(), {
+        headers: { 'Authorization': `Bearer ${token}` },
+      });
+
+      const data = await response.json() as Record<string, unknown>;
+
+      if (data.code !== 0) {
+        throw new Error(`飞书读取失败: ${data.msg || '未知错误'} (code: ${data.code})`);
+      }
+
+      const items = (data.data as Record<string, unknown>)?.items as Array<Record<string, unknown>>;
+      if (items) allItems.push(...items);
+
+      pageToken = ((data.data as Record<string, unknown>)?.page_token as string) || '';
+    } while (pageToken);
+
+    // Extract field values with numbering
+    const records = allItems.map((item, index) => {
+      const fields = item.fields as Record<string, unknown>;
+      const value = fields?.[fieldName];
+      return {
+        index: index + 1,
+        value: value !== undefined && value !== null ? String(value) : '',
+      };
+    });
+
+    res.json({
+      success: true,
+      data: {
+        field_name: fieldName,
+        total: records.length,
+        records,
+      },
+    });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : '获取飞书表格数据失败';
+    res.status(500).json({ success: false, error: message });
+  }
+});
+
 export default router;
