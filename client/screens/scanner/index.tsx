@@ -7,6 +7,7 @@ import {
   Animated,
   Platform,
   ActivityIndicator,
+  Linking,
 } from 'react-native';
 import { CameraView, useCameraPermissions, type BarcodeScanningResult } from 'expo-camera';
 import * as Haptics from 'expo-haptics';
@@ -22,6 +23,8 @@ interface Stats {
   today_success: number;
   failed: number;
 }
+
+const FEISHU_BITABLE_URL = 'https://gcnop2681oz6.feishu.cn/base/FeYNbNOGcaZltysJowEcuzginfd?table=tblCmub3OU18zCle&view=vewzaoO9z0';
 
 export default function ScannerScreen() {
   const insets = useSafeAreaInsets();
@@ -311,6 +314,17 @@ export default function ScannerScreen() {
               <Text style={styles.statLabel}>登记失败</Text>
             </View>
           </View>
+
+          {/* Jump to Feishu Button */}
+          <TouchableOpacity
+            style={styles.feishuButton}
+            onPress={() => Linking.openURL(FEISHU_BITABLE_URL)}
+            activeOpacity={0.7}
+          >
+            <FontAwesome6 name="table-columns" size={16} color="#4F46E5" />
+            <Text style={styles.feishuButtonText}>查看飞书表格</Text>
+            <FontAwesome6 name="arrow-up-right-from-square" size={12} color="#4F46E5" />
+          </TouchableOpacity>
         </View>
       </View>
     </Screen>
@@ -607,5 +621,22 @@ const styles = StyleSheet.create({
     color: '#78716C',
     marginTop: 4,
     fontWeight: '500',
+  },
+  feishuButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    marginTop: 16,
+    paddingVertical: 12,
+    borderRadius: 14,
+    backgroundColor: 'rgba(79, 70, 229, 0.08)',
+    borderWidth: 1,
+    borderColor: 'rgba(79, 70, 229, 0.15)',
+  },
+  feishuButtonText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#4F46E5',
   },
 });
