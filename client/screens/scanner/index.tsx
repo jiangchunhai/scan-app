@@ -313,6 +313,10 @@ export default function ScannerScreen() {
             <View style={styles.noPermission}>
               <FontAwesome6 name="camera" size={48} color="#78716C" />
               <Text style={styles.noPermissionText}>需要相机权限才能扫码</Text>
+              <TouchableOpacity style={styles.permissionButton} onPress={requestCameraPermission}>
+                <FontAwesome6 name="shield-halved" size={16} color="#FFF" />
+                <Text style={styles.permissionButtonText}>请求相机权限</Text>
+              </TouchableOpacity>
             </View>
           )}
         </View>
@@ -676,6 +680,21 @@ const styles = StyleSheet.create({
   noPermissionText: {
     fontSize: 14,
     color: '#78716C',
+  },
+  permissionButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    backgroundColor: '#4F46E5',
+    paddingHorizontal: 24,
+    paddingVertical: 12,
+    borderRadius: 12,
+    marginTop: 8,
+  },
+  permissionButtonText: {
+    color: '#FFF',
+    fontSize: 15,
+    fontWeight: '600',
   },
   // Confirmation Modal
   confirmOverlay: {
