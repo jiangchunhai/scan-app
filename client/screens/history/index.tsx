@@ -13,11 +13,11 @@ import { useFocusEffect } from 'expo-router';
 import dayjs from 'dayjs';
 
 interface ScanRecord {
-  id: string;
-  barcode: string;
+  user_id: string;
+  user_name: string;
+  scan_time: string;
+  raw_data: { barcode?: string; [key: string]: unknown };
   status: 'pending' | 'success' | 'failed';
-  error_message: string | null;
-  created_at: string;
 }
 
 export default function HistoryScreen() {
@@ -40,15 +40,23 @@ export default function HistoryScreen() {
       );
       const result = await response.json() as {
         success: boolean;
-        data: { records: ScanRecord[]; total: number };
+        data: ScanRecord[];
       };
       if (result.success) {
+        const mappedRecords = result.data.map((r: Record<string, unknown>) => ({
+          id: String(r.user_id || ''),
+          barcode: r.raw_data?.barcode || r.raw_data?.raw_content || String(r.raw_data || ''),
+          status: r.status as 'success' | 'failed' | 'pending',
+          error_message: r.error_message as string | undefined,
+          created_at: r.scan_time as string,
+          user_name: r.user_name as string | undefined,
+        }));
         if (append) {
-          setRecords(prev => [...prev, ...result.data.records]);
+          setRecords(prev => [...prev, ...mappedRecords]);
         } else {
-          setRecords(result.data.records);
+          setRecords(mappedRecords);
         }
-        setTotal(result.data.total);
+        setTotal(mappedRecords.length);
         setPage(pageNum);
       }
     } catch {

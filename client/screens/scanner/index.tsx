@@ -76,9 +76,16 @@ export default function ScannerScreen() {
   const fetchStats = useCallback(async () => {
     try {
       const response = await fetch(`${process.env.EXPO_PUBLIC_BACKEND_BASE_URL}/api/v1/feishu/stats`);
-      const result = await response.json() as { success: boolean; data: Stats };
+      const result = await response.json() as { success: boolean; data: Record<string, number> };
       if (result.success) {
-        setStats(result.data);
+        const d = result.data;
+        setStats({
+          total: d.total_scans ?? d.total ?? 0,
+          today: d.today_scans ?? d.today ?? 0,
+          success: d.success_scans ?? d.success ?? 0,
+          today_success: d.today_success ?? 0,
+          failed: d.failed_scans ?? d.failed ?? 0,
+        });
       }
     } catch {
       // Silently fail
@@ -92,10 +99,14 @@ export default function ScannerScreen() {
       const response = await fetch(`${process.env.EXPO_PUBLIC_BACKEND_BASE_URL}/api/v1/feishu/table-records`);
       const result = await response.json() as {
         success: boolean;
-        data: { field_name: string; total: number; records: Array<{ index: number; value: string }> };
+        data: Array<{ fields: Record<string, unknown> }>;
       };
       if (result.success) {
-        setTableRecords(result.data.records);
+        const mapped = result.data.map((item, idx) => ({
+          index: idx + 1,
+          value: String(item.fields?.['1688订单编号'] || ''),
+        }));
+        setTableRecords(mapped);
         setShowTableModal(true);
       }
     } catch {
@@ -151,27 +162,28 @@ export default function ScannerScreen() {
 
     try {
       /**
-       * 服务端文件：server/src/routes/feishu.ts
+       * 服务端文件：部署后端 /api/v1/feishu/scan
        * 接口：POST /api/v1/feishu/scan
-       * Body 参数：barcode: string
+       * Body 参数：user_id: string, raw_data: { barcode: string }
        */
       const response = await fetch(`${process.env.EXPO_PUBLIC_BACKEND_BASE_URL}/api/v1/feishu/scan`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ barcode: data }),
+        body: JSON.stringify({ user_id: 'mobile-app', raw_data: { barcode: data } }),
       });
 
       const result = await response.json() as {
         success: boolean;
         error?: string;
         message?: string;
-        data?: { barcode: string; status: string };
+        data?: { barcode?: string; status: string; raw_data?: { barcode: string } };
       };
 
       if (result.success) {
         const isDuplicate = result.data?.status === 'duplicate';
+        const barcode = result.data?.raw_data?.barcode || result.data?.barcode || data;
         setLastScan({
-          barcode: data,
+          barcode,
           status: isDuplicate ? 'duplicate' : 'success',
           error: isDuplicate ? result.message : undefined,
         });
