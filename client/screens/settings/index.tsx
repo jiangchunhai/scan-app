@@ -46,10 +46,11 @@ export default function SettingsScreen() {
       const response = await fetch(`${process.env.EXPO_PUBLIC_BACKEND_BASE_URL}/api/v1/feishu/config`);
       const result = await response.json() as { success: boolean; data: FeishuConfig | null };
       if (result.success && result.data) {
-        setAppId(result.data.app_id);
-        setAppToken(result.data.app_token);
-        setTableId(result.data.table_id);
-        setFieldName(result.data.field_name || '订单编号');
+        const d = result.data as Record<string, unknown>;
+        setAppId(d.app_id as string);
+        setAppToken((d.app_token ?? d.bitable_app_token) as string);
+        setTableId((d.table_id ?? d.bitable_table_id) as string);
+        setFieldName((d.field_name ?? d.bit_table_field_name ?? '订单编号') as string);
         setHasConfig(true);
         // Don't load app_secret for security, user needs to re-enter to update
       }
