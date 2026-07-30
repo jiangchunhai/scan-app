@@ -1,0 +1,10 @@
+{
+  "expo": {
+    "name": "扫码识别",
+    "slug": "saoma",
+    "version": "1.0.1",
+    "extra": { "eas": { "projectId": "ae4f2f75-e6ba-4098-abc7-2fb7046b0779" } },
+    "owner": "jiangchunhais-team",
+    "android": { "package": "com.jiangchunhai.saoma" }
+  }
+}
