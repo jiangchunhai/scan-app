@@ -255,6 +255,39 @@ export default function ScannerScreen() {
           )}
         </View>
 
+        {/* Last Scan Result Card */}
+        {lastScan && lastScan.status !== 'pending' && (
+          <View style={styles.resultSection}>
+            <View style={[
+              styles.resultCard,
+              lastScan.status === 'success' ? styles.resultCardSuccess : styles.resultCardFailed,
+            ]}>
+              <View style={styles.resultHeader}>
+                <View style={[styles.resultIcon, lastScan.status === 'success' ? styles.resultIconSuccess : styles.resultIconFailed]}>
+                  <FontAwesome6
+                    name={lastScan.status === 'success' ? 'check-circle' : 'times-circle'}
+                    size={20}
+                    color={lastScan.status === 'success' ? '#10B981' : '#EF4444'}
+                  />
+                </View>
+                <Text style={[
+                  styles.resultLabel,
+                  lastScan.status === 'success' ? styles.resultLabelSuccess : styles.resultLabelFailed,
+                ]}>
+                  {lastScan.status === 'success' ? '登记成功' : '登记失败'}
+                </Text>
+              </View>
+              <View style={styles.resultBarcodeBox}>
+                <Text style={styles.resultBarcodeLabel}>扫描内容</Text>
+                <Text style={styles.resultBarcodeValue} selectable>{lastScan.barcode}</Text>
+              </View>
+              {lastScan.status === 'failed' && lastScan.error && (
+                <Text style={styles.resultErrorText}>{lastScan.error}</Text>
+              )}
+            </View>
+          </View>
+        )}
+
         {/* Statistics Panel */}
         <View style={styles.statsPanel}>
           <View style={styles.statsRow}>
@@ -455,6 +488,82 @@ const styles = StyleSheet.create({
   noPermissionText: {
     fontSize: 14,
     color: '#78716C',
+  },
+  resultSection: {
+    paddingHorizontal: 20,
+    marginTop: 12,
+  },
+  resultCard: {
+    borderRadius: 20,
+    padding: 16,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.08,
+    shadowRadius: 12,
+    elevation: 4,
+  },
+  resultCardSuccess: {
+    backgroundColor: '#FFFFFF',
+    shadowColor: '#10B981',
+    borderWidth: 1.5,
+    borderColor: 'rgba(16, 185, 129, 0.2)',
+  },
+  resultCardFailed: {
+    backgroundColor: '#FFFFFF',
+    shadowColor: '#EF4444',
+    borderWidth: 1.5,
+    borderColor: 'rgba(239, 68, 68, 0.2)',
+  },
+  resultHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 12,
+  },
+  resultIcon: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  resultIconSuccess: {
+    backgroundColor: 'rgba(16, 185, 129, 0.1)',
+  },
+  resultIconFailed: {
+    backgroundColor: 'rgba(239, 68, 68, 0.1)',
+  },
+  resultLabel: {
+    fontSize: 15,
+    fontWeight: '700',
+  },
+  resultLabelSuccess: {
+    color: '#059669',
+  },
+  resultLabelFailed: {
+    color: '#DC2626',
+  },
+  resultBarcodeBox: {
+    backgroundColor: '#F5F5F4',
+    borderRadius: 12,
+    padding: 12,
+  },
+  resultBarcodeLabel: {
+    fontSize: 11,
+    color: '#A8A29E',
+    fontWeight: '500',
+    marginBottom: 4,
+  },
+  resultBarcodeValue: {
+    fontSize: 20,
+    fontWeight: '800',
+    color: '#1C1917',
+    letterSpacing: 1,
+  },
+  resultErrorText: {
+    fontSize: 12,
+    color: '#DC2626',
+    marginTop: 8,
+    lineHeight: 18,
   },
   statsPanel: {
     marginTop: 16,
