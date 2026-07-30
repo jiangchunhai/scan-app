@@ -33,8 +33,9 @@ export default function ScannerScreen() {
   const [permission, requestPermission] = useCameraPermissions();
   const hasPermission = permission?.granted ?? false;
   const [scanning, setScanning] = useState(true);
-  const [lastScan, setLastScan] = useState<{ barcode: string; status: 'success' | 'failed' | 'pending'; error?: string } | null>(null);
+  const [lastScan, setLastScan] = useState<{ barcode: string; status: 'success' | 'failed' | 'duplicate'; error?: string } | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
+  const [pendingBarcode, setPendingBarcode] = useState<string | null>(null);
   const [stats, setStats] = useState<Stats>({ total: 0, today: 0, success: 0, today_success: 0, failed: 0 });
   const [configReady, setConfigReady] = useState(false);
   const [tableRecords, setTableRecords] = useState<Array<{ index: number; value: string }>>([]);
@@ -131,14 +132,22 @@ export default function ScannerScreen() {
     if (isProcessing) return;
 
     lastScanTime.current = now;
-    setLastScan({ barcode: data, status: 'pending' });
-    setIsProcessing(true);
-    setScanning(false);
 
-    // Haptic feedback
+    // Haptic feedback on scan
     if (Platform.OS !== 'web') {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     }
+
+    // Show confirmation modal instead of auto-syncing
+    setPendingBarcode(data);
+    setScanning(false);
+  }, [isProcessing]);
+
+  const handleConfirmSync = useCallback(async () => {
+    if (!pendingBarcode) return;
+    const data = pendingBarcode;
+    setPendingBarcode(null);
+    setIsProcessing(true);
 
     try {
       /**
@@ -155,6 +164,7 @@ export default function ScannerScreen() {
       const result = await response.json() as {
         success: boolean;
         error?: string;
+        message?: string;
         data?: { barcode: string; status: string };
       };
 
@@ -188,12 +198,17 @@ export default function ScannerScreen() {
       }
     } finally {
       setIsProcessing(false);
-      // Resume scanning after 2 seconds
+      // Resume scanning after 2.5 seconds
       setTimeout(() => {
         setScanning(true);
-      }, 2000);
+      }, 2500);
     }
-  }, [isProcessing, fetchStats]);
+  }, [pendingBarcode, fetchStats]);
+
+  const handleCancelScan = useCallback(() => {
+    setPendingBarcode(null);
+    setScanning(true);
+  }, []);
 
   const scanLineTranslateY = scanLineAnim.interpolate({
     inputRange: [0, 1],
@@ -255,28 +270,21 @@ export default function ScannerScreen() {
                   styles.statusOverlay,
                   lastScan.status === 'success' && styles.statusSuccess,
                   lastScan.status === 'failed' && styles.statusFailed,
-                  lastScan.status === 'pending' && styles.statusPending,
                   lastScan.status === 'duplicate' && styles.statusDuplicate,
                 ]}>
-                  {lastScan.status === 'pending' ? (
-                    <ActivityIndicator color="#fff" size="small" />
-                  ) : (
-                    <FontAwesome6
-                      name={lastScan.status === 'success' ? 'check-circle'
-                        : lastScan.status === 'duplicate' ? 'copy'
-                        : 'times-circle'}
-                      size={24}
-                      color="#fff"
-                    />
-                  )}
+                  <FontAwesome6
+                    name={lastScan.status === 'success' ? 'check-circle'
+                      : lastScan.status === 'duplicate' ? 'copy'
+                      : 'times-circle'}
+                    size={24}
+                    color="#fff"
+                  />
                   <Text style={styles.statusText} numberOfLines={1}>
-                    {lastScan.status === 'pending'
-                      ? '正在登记...'
-                      : lastScan.status === 'success'
-                        ? `已登记: ${lastScan.barcode}`
-                        : lastScan.status === 'duplicate'
-                          ? `已存在: ${lastScan.barcode}`
-                          : `失败: ${lastScan.error || '未知错误'}`}
+                    {lastScan.status === 'success'
+                      ? `已登记: ${lastScan.barcode}`
+                      : lastScan.status === 'duplicate'
+                        ? `已存在: ${lastScan.barcode}`
+                        : `失败: ${lastScan.error || '未知错误'}`}
                   </Text>
                 </View>
               )}
@@ -297,8 +305,49 @@ export default function ScannerScreen() {
           )}
         </View>
 
+        {/* Confirmation Modal */}
+        <Modal
+          visible={pendingBarcode !== null}
+          transparent
+          animationType="fade"
+          onRequestClose={handleCancelScan}
+        >
+          <View style={styles.confirmOverlay}>
+            <View style={styles.confirmCard}>
+              <View style={styles.confirmIconWrap}>
+                <FontAwesome6 name="barcode" size={36} color="#4F46E5" />
+              </View>
+              <Text style={styles.confirmTitle}>确认登记到飞书</Text>
+              <View style={styles.confirmBarcodeBox}>
+                <Text style={styles.confirmBarcodeLabel}>订单编号</Text>
+                <Text style={styles.confirmBarcodeValue} selectable>{pendingBarcode}</Text>
+              </View>
+              <View style={styles.confirmButtons}>
+                <TouchableOpacity
+                  style={[styles.confirmBtn, styles.confirmBtnCancel]}
+                  onPress={handleCancelScan}
+                  disabled={isProcessing}
+                >
+                  <Text style={styles.confirmBtnCancelText}>取消</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.confirmBtn, styles.confirmBtnOk]}
+                  onPress={handleConfirmSync}
+                  disabled={isProcessing}
+                >
+                  {isProcessing ? (
+                    <ActivityIndicator color="#fff" size="small" />
+                  ) : (
+                    <Text style={styles.confirmBtnOkText}>确认</Text>
+                  )}
+                </TouchableOpacity>
+              </View>
+            </View>
+          </View>
+        </Modal>
+
         {/* Last Scan Result Card */}
-        {lastScan && lastScan.status !== 'pending' && (
+        {lastScan && (
           <View style={styles.resultSection}>
             <View style={[
               styles.resultCard,
@@ -615,6 +664,90 @@ const styles = StyleSheet.create({
   noPermissionText: {
     fontSize: 14,
     color: '#78716C',
+  },
+  // Confirmation Modal
+  confirmOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 32,
+  },
+  confirmCard: {
+    width: '100%',
+    backgroundColor: '#FFFFFF',
+    borderRadius: 24,
+    padding: 28,
+    alignItems: 'center',
+    shadowColor: '#4F46E5',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.15,
+    shadowRadius: 24,
+    elevation: 8,
+  },
+  confirmIconWrap: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    backgroundColor: '#EEF2FF',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  confirmTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#1E293B',
+    marginBottom: 16,
+  },
+  confirmBarcodeBox: {
+    width: '100%',
+    backgroundColor: '#F8FAFC',
+    borderRadius: 16,
+    padding: 16,
+    marginBottom: 24,
+    alignItems: 'center',
+  },
+  confirmBarcodeLabel: {
+    fontSize: 12,
+    color: '#94A3B8',
+    marginBottom: 6,
+    fontWeight: '500',
+  },
+  confirmBarcodeValue: {
+    fontSize: 20,
+    fontWeight: '700',
+    color: '#1E293B',
+    textAlign: 'center',
+    fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
+  },
+  confirmButtons: {
+    flexDirection: 'row',
+    gap: 12,
+    width: '100%',
+  },
+  confirmBtn: {
+    flex: 1,
+    paddingVertical: 14,
+    borderRadius: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  confirmBtnCancel: {
+    backgroundColor: '#F1F5F9',
+  },
+  confirmBtnCancelText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#64748B',
+  },
+  confirmBtnOk: {
+    backgroundColor: '#4F46E5',
+  },
+  confirmBtnOkText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#FFFFFF',
   },
   resultSection: {
     paddingHorizontal: 20,
