@@ -23,6 +23,8 @@ export default function RootLayout() {
         }}
       >
         <Stack.Screen name="index" options={{ title: "" }} />
+        <Stack.Screen name="history" options={{ title: "" }} />
+        <Stack.Screen name="settings" options={{ title: "" }} />
       </Stack>
       <Toast />
     </Provider>
