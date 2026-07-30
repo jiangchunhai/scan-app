@@ -1394,8 +1394,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     gap: 8,
     paddingVertical: 12,
-    marginTop: 16,
-    marginBottom: 12,
     backgroundColor: '#ECFDF5',
     borderRadius: 12,
     borderWidth: 1,
@@ -1429,6 +1427,7 @@ const styles = StyleSheet.create({
   },
   buttonGroup: {
     gap: 12,
+    marginTop: 16,
   },
   clearConfirmContent: {
     width: '85%',
