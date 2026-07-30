@@ -1,15 +1,11 @@
 import { ExpoConfig, ConfigContext } from 'expo/config';
 
-const appName = process.env.COZE_PROJECT_NAME || process.env.EXPO_PUBLIC_COZE_PROJECT_NAME || '应用';
-const projectId = process.env.COZE_PROJECT_ID || process.env.EXPO_PUBLIC_COZE_PROJECT_ID;
-const slugAppName = projectId ? `app${projectId}` : 'myapp';
-
 export default ({ config }: ConfigContext): ExpoConfig => {
   return {
     ...config,
-    "name": appName,
-    "slug": slugAppName,
-    "version": "1.0.0",
+    "name": "扫码识别",
+    "slug": "saoma",
+    "version": "1.0.5",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "myapp",
@@ -21,9 +17,9 @@ export default ({ config }: ConfigContext): ExpoConfig => {
     "android": {
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/adaptive-icon.png",
-        "backgroundColor": "#ffffff"
+        "backgroundColor": "#5EEAD4"
       },
-      "package": `com.anonymous.x${projectId || '0'}`
+      "package": "com.saoma.app"
     },
     "web": {
       "bundler": "metro",
@@ -31,12 +27,7 @@ export default ({ config }: ConfigContext): ExpoConfig => {
       "favicon": "./assets/images/favicon.png"
     },
     "plugins": [
-      process.env.EXPO_PUBLIC_BACKEND_BASE_URL ? [
-        "expo-router",
-        {
-          "origin": process.env.EXPO_PUBLIC_BACKEND_BASE_URL
-        }
-      ] : 'expo-router',
+      "expo-router",
       [
         "expo-splash-screen",
         {
@@ -49,28 +40,35 @@ export default ({ config }: ConfigContext): ExpoConfig => {
       [
         "expo-image-picker",
         {
-          "photosPermission": `允许新项目App访问您的相册，以便您上传或保存图片。`,
-          "cameraPermission": `允许新项目App使用您的相机，以便您直接拍摄照片上传。`,
-          "microphonePermission": `允许新项目App访问您的麦克风，以便您拍摄带有声音的视频。`
+          "photosPermission": "允许访问相册",
+          "cameraPermission": "允许使用相机",
+          "microphonePermission": "允许访问麦克风"
         }
       ],
       [
         "expo-location",
         {
-          "locationWhenInUsePermission": `新项目App需要访问您的位置以提供周边服务及导航功能。`
+          "locationWhenInUsePermission": "需要访问位置"
         }
       ],
       [
         "expo-camera",
         {
-          "cameraPermission": `新项目App需要访问相机以拍摄照片和视频。`,
-          "microphonePermission": `新项目App需要访问麦克风以录制视频声音。`,
+          "cameraPermission": "允许 APP 使用摄像头扫描条形码",
+          "microphonePermission": "允许使用麦克风",
           "recordAudioAndroid": true
         }
       ]
     ],
     "experiments": {
       "typedRoutes": true
-    }
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "ae4f2f75-e6ba-4098-abc7-2fb7046b0779"
+      }
+    },
+    "owner": "jiangchunhais-team"
   }
 }
