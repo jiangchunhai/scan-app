@@ -2,12 +2,12 @@
   "expo": {
     "name": "扫码识别",
     "slug": "saoma",
-    "version": "1.0.7",
+    "version": "1.0.9",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "myapp",
     "userInterfaceStyle": "automatic",
-    "newArchEnabled": true,
+    "newArchEnabled": false,
     "android": {
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/adaptive-icon.png",
@@ -30,10 +30,10 @@
       [
         "expo-splash-screen",
         {
+          "backgroundColor": "#ffffff",
           "image": "./assets/images/splash-icon.png",
-          "imageWidth": 150,
-          "resizeMode": "contain",
-          "backgroundColor": "#0D9488"
+          "imageWidth": 120,
+          "resizeMode": "contain"
         }
       ],
       [
