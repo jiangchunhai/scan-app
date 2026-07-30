@@ -159,9 +159,18 @@ export default function ScannerScreen() {
       };
 
       if (result.success) {
-        setLastScan({ barcode: data, status: 'success' });
+        const isDuplicate = result.data?.status === 'duplicate';
+        setLastScan({
+          barcode: data,
+          status: isDuplicate ? 'duplicate' : 'success',
+          error: isDuplicate ? result.message : undefined,
+        });
         if (Platform.OS !== 'web') {
-          Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+          Haptics.notificationAsync(
+            isDuplicate
+              ? Haptics.NotificationFeedbackType.Warning
+              : Haptics.NotificationFeedbackType.Success
+          );
         }
       } else {
         setLastScan({ barcode: data, status: 'failed', error: result.error });
@@ -247,12 +256,15 @@ export default function ScannerScreen() {
                   lastScan.status === 'success' && styles.statusSuccess,
                   lastScan.status === 'failed' && styles.statusFailed,
                   lastScan.status === 'pending' && styles.statusPending,
+                  lastScan.status === 'duplicate' && styles.statusDuplicate,
                 ]}>
                   {lastScan.status === 'pending' ? (
                     <ActivityIndicator color="#fff" size="small" />
                   ) : (
                     <FontAwesome6
-                      name={lastScan.status === 'success' ? 'check-circle' : 'times-circle'}
+                      name={lastScan.status === 'success' ? 'check-circle'
+                        : lastScan.status === 'duplicate' ? 'copy'
+                        : 'times-circle'}
                       size={24}
                       color="#fff"
                     />
@@ -262,7 +274,9 @@ export default function ScannerScreen() {
                       ? '正在登记...'
                       : lastScan.status === 'success'
                         ? `已登记: ${lastScan.barcode}`
-                        : `失败: ${lastScan.error || '未知错误'}`}
+                        : lastScan.status === 'duplicate'
+                          ? `已存在: ${lastScan.barcode}`
+                          : `失败: ${lastScan.error || '未知错误'}`}
                   </Text>
                 </View>
               )}
@@ -288,21 +302,36 @@ export default function ScannerScreen() {
           <View style={styles.resultSection}>
             <View style={[
               styles.resultCard,
-              lastScan.status === 'success' ? styles.resultCardSuccess : styles.resultCardFailed,
+              lastScan.status === 'success' ? styles.resultCardSuccess
+                : lastScan.status === 'duplicate' ? styles.resultCardDuplicate
+                : styles.resultCardFailed,
             ]}>
               <View style={styles.resultHeader}>
-                <View style={[styles.resultIcon, lastScan.status === 'success' ? styles.resultIconSuccess : styles.resultIconFailed]}>
+                <View style={[
+                  styles.resultIcon,
+                  lastScan.status === 'success' ? styles.resultIconSuccess
+                    : lastScan.status === 'duplicate' ? styles.resultIconDuplicate
+                    : styles.resultIconFailed,
+                ]}>
                   <FontAwesome6
-                    name={lastScan.status === 'success' ? 'check-circle' : 'times-circle'}
+                    name={lastScan.status === 'success' ? 'check-circle'
+                      : lastScan.status === 'duplicate' ? 'copy'
+                      : 'times-circle'}
                     size={20}
-                    color={lastScan.status === 'success' ? '#10B981' : '#EF4444'}
+                    color={lastScan.status === 'success' ? '#10B981'
+                      : lastScan.status === 'duplicate' ? '#F59E0B'
+                      : '#EF4444'}
                   />
                 </View>
                 <Text style={[
                   styles.resultLabel,
-                  lastScan.status === 'success' ? styles.resultLabelSuccess : styles.resultLabelFailed,
+                  lastScan.status === 'success' ? styles.resultLabelSuccess
+                    : lastScan.status === 'duplicate' ? styles.resultLabelDuplicate
+                    : styles.resultLabelFailed,
                 ]}>
-                  {lastScan.status === 'success' ? '登记成功' : '登记失败'}
+                  {lastScan.status === 'success' ? '登记成功'
+                    : lastScan.status === 'duplicate' ? '已存在，已跳过'
+                    : '登记失败'}
                 </Text>
               </View>
               <View style={styles.resultBarcodeBox}>
@@ -311,6 +340,9 @@ export default function ScannerScreen() {
               </View>
               {lastScan.status === 'failed' && lastScan.error && (
                 <Text style={styles.resultErrorText}>{lastScan.error}</Text>
+              )}
+              {lastScan.status === 'duplicate' && lastScan.error && (
+                <Text style={styles.resultDuplicateText}>{lastScan.error}</Text>
               )}
             </View>
 
@@ -535,6 +567,9 @@ const styles = StyleSheet.create({
   statusFailed: {
     backgroundColor: 'rgba(239, 68, 68, 0.9)',
   },
+  statusDuplicate: {
+    backgroundColor: 'rgba(245, 158, 11, 0.9)',
+  },
   statusPending: {
     backgroundColor: 'rgba(13, 148, 136, 0.9)',
   },
@@ -605,6 +640,12 @@ const styles = StyleSheet.create({
     borderWidth: 1.5,
     borderColor: 'rgba(239, 68, 68, 0.2)',
   },
+  resultCardDuplicate: {
+    backgroundColor: '#FFFFFF',
+    shadowColor: '#F59E0B',
+    borderWidth: 1.5,
+    borderColor: 'rgba(245, 158, 11, 0.2)',
+  },
   resultHeader: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -624,6 +665,9 @@ const styles = StyleSheet.create({
   resultIconFailed: {
     backgroundColor: 'rgba(239, 68, 68, 0.1)',
   },
+  resultIconDuplicate: {
+    backgroundColor: 'rgba(245, 158, 11, 0.1)',
+  },
   resultLabel: {
     fontSize: 15,
     fontWeight: '700',
@@ -633,6 +677,9 @@ const styles = StyleSheet.create({
   },
   resultLabelFailed: {
     color: '#DC2626',
+  },
+  resultLabelDuplicate: {
+    color: '#D97706',
   },
   resultBarcodeBox: {
     backgroundColor: '#F5F5F4',
@@ -654,6 +701,12 @@ const styles = StyleSheet.create({
   resultErrorText: {
     fontSize: 12,
     color: '#DC2626',
+    marginTop: 8,
+    lineHeight: 18,
+  },
+  resultDuplicateText: {
+    fontSize: 12,
+    color: '#D97706',
     marginTop: 8,
     lineHeight: 18,
   },

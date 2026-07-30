@@ -161,6 +161,51 @@ router.post('/scan', async (req: Request, res: Response) => {
 
     const config = configs[0];
 
+    // Check if barcode already exists in Feishu table (duplicate filter)
+    const token = await getTenantAccessToken(config.app_id, config.app_secret);
+    const fieldName = config.field_name || '订单编号';
+
+    const checkResponse = await fetch(
+      `https://open.feishu.cn/open-apis/bitable/v1/apps/${config.app_token}/tables/${config.table_id}/records/search?page_size=1`,
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          filter: {
+            conjunction: 'and',
+            conditions: [
+              { field_name: fieldName, operator: 'is', value: [barcode] },
+            ],
+          },
+        }),
+      }
+    );
+
+    const checkData = await checkResponse.json() as Record<string, unknown>;
+
+    if (checkData.code === 0) {
+      const result = checkData.data as Record<string, unknown>;
+      const total = result.total as number;
+      if (total > 0) {
+        // Duplicate found - record locally but skip Feishu write
+        const { data: dupRecord } = await client
+          .from('scan_records')
+          .insert({ barcode, status: 'failed', error_message: '订单编号已存在，跳过重复登记' })
+          .select()
+          .single();
+
+        res.json({
+          success: true,
+          data: { id: dupRecord?.id, barcode, status: 'duplicate' },
+          message: '该订单编号已存在，已跳过重复登记',
+        });
+        return;
+      }
+    }
+
     // Insert pending record
     const { data: recordData, error: recordError } = await client
       .from('scan_records')
@@ -171,11 +216,7 @@ router.post('/scan', async (req: Request, res: Response) => {
     if (recordError) throw new Error(`创建记录失败: ${recordError.message}`);
 
     try {
-      // Get tenant access token
-      const token = await getTenantAccessToken(config.app_id, config.app_secret);
-
       // Create record in Feishu Bitable
-      const fieldName = config.field_name || '订单编号';
       const feishuResponse = await fetch(
         `https://open.feishu.cn/open-apis/bitable/v1/apps/${config.app_token}/tables/${config.table_id}/records`,
         {
