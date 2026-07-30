@@ -83,7 +83,7 @@ export default function ScannerScreen() {
           total: d.total_scans ?? d.total ?? 0,
           today: d.today_scans ?? d.today ?? 0,
           success: d.success_scans ?? d.success ?? 0,
-          today_success: d.today_success ?? 0,
+          today_success: d.today_success ?? d.success_scans ?? d.success ?? 0,
           failed: d.failed_scans ?? d.failed ?? 0,
         });
       }
