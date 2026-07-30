@@ -116,6 +116,23 @@ export default function ScannerScreen() {
     }
   }, []);
 
+  // Load table records silently for duplicate detection (no modal)
+  const loadTableRecordsForDedup = useCallback(async () => {
+    try {
+      const response = await fetch(`${process.env.EXPO_PUBLIC_BACKEND_BASE_URL}/api/v1/feishu/table-records?user_id=mobile-app`);
+      const result = await response.json() as { success: boolean; data: Array<{ fields: Record<string, unknown> }> | null };
+      if (result.success && result.data) {
+        const mapped = result.data.map((item, idx) => ({
+          index: idx + 1,
+          value: String(item.fields?.['1688订单编号'] || ''),
+        }));
+        setTableRecords(mapped);
+      }
+    } catch {
+      // Silently fail
+    }
+  }, []);
+
   // Check if Feishu config exists
   const checkConfig = useCallback(async () => {
     try {
@@ -132,7 +149,8 @@ export default function ScannerScreen() {
     useCallback(() => {
       fetchStats();
       checkConfig();
-    }, [fetchStats, checkConfig])
+      loadTableRecordsForDedup(); // Load records for duplicate detection
+    }, [fetchStats, checkConfig, loadTableRecordsForDedup])
   );
 
   // Handle barcode scan
@@ -149,10 +167,21 @@ export default function ScannerScreen() {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     }
 
+    // Check if barcode already exists in Feishu table (frontend duplicate detection)
+    const isDuplicate = tableRecords.some(r => r.value === data);
+    if (isDuplicate) {
+      setLastScan({
+        barcode: data,
+        status: 'duplicate',
+        error: '该订单编号已登记，无需重复提交',
+      });
+      return;
+    }
+
     // Show confirmation modal instead of auto-syncing
     setPendingBarcode(data);
     setScanning(false);
-  }, [isProcessing]);
+  }, [isProcessing, tableRecords]);
 
   const handleConfirmSync = useCallback(async () => {
     if (!pendingBarcode) return;
@@ -202,6 +231,7 @@ export default function ScannerScreen() {
       }
 
       fetchStats();
+      fetchTableRecords(); // Refresh table records for duplicate detection
     } catch (err) {
       const errorMsg = err instanceof Error ? err.message : '网络请求失败';
       setLastScan({ barcode: data, status: 'failed', error: errorMsg });
