@@ -240,10 +240,8 @@ export default function ScannerScreen() {
       }
     } finally {
       setIsProcessing(false);
-      // Resume scanning after 2.5 seconds
-      setTimeout(() => {
-        setScanning(true);
-      }, 2500);
+      // Resume scanning immediately
+      setScanning(true);
     }
   }, [pendingBarcode, fetchStats]);
 
