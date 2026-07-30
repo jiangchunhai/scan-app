@@ -18,9 +18,12 @@ import { useFocusEffect } from 'expo-router';
 interface FeishuConfig {
   id: string;
   app_id: string;
-  app_token: string;
-  table_id: string;
-  field_name: string;
+  app_token?: string;
+  table_id?: string;
+  field_name?: string;
+  bitable_app_token?: string;
+  bitable_table_id?: string;
+  bit_table_field_name?: string;
 }
 
 export default function SettingsScreen() {
@@ -46,11 +49,11 @@ export default function SettingsScreen() {
       const response = await fetch(`${process.env.EXPO_PUBLIC_BACKEND_BASE_URL}/api/v1/feishu/config`);
       const result = await response.json() as { success: boolean; data: FeishuConfig | null };
       if (result.success && result.data) {
-        const d = result.data as Record<string, unknown>;
-        setAppId(d.app_id as string);
-        setAppToken((d.app_token ?? d.bitable_app_token) as string);
-        setTableId((d.table_id ?? d.bitable_table_id) as string);
-        setFieldName((d.field_name ?? d.bit_table_field_name ?? '订单编号') as string);
+        const d = result.data;
+        setAppId(d.app_id || '');
+        setAppToken(d.app_token || d.bitable_app_token || '');
+        setTableId(d.table_id || d.bitable_table_id || '');
+        setFieldName(d.field_name || d.bit_table_field_name || '订单编号');
         setHasConfig(true);
         // Don't load app_secret for security, user needs to re-enter to update
       }

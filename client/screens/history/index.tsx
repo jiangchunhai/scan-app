@@ -12,16 +12,26 @@ import { Screen } from '@/components/Screen';
 import { useFocusEffect } from 'expo-router';
 import dayjs from 'dayjs';
 
+interface MappedRecord {
+  id: string;
+  barcode: string;
+  status: 'pending' | 'success' | 'failed';
+  error_message?: string;
+  created_at: string;
+  user_name?: string;
+}
+
 interface ScanRecord {
   user_id: string;
   user_name: string;
   scan_time: string;
-  raw_data: { barcode?: string; [key: string]: unknown };
+  raw_data: { barcode?: string; raw_content?: string; [key: string]: unknown };
   status: 'pending' | 'success' | 'failed';
+  error_message?: string;
 }
 
 export default function HistoryScreen() {
-  const [records, setRecords] = useState<ScanRecord[]>([]);
+  const [records, setRecords] = useState<MappedRecord[]>([]);
   const [page, setPage] = useState(1);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(false);
@@ -43,13 +53,13 @@ export default function HistoryScreen() {
         data: ScanRecord[];
       };
       if (result.success) {
-        const mappedRecords = result.data.map((r: Record<string, unknown>) => ({
+        const mappedRecords: MappedRecord[] = result.data.map((r) => ({
           id: String(r.user_id || ''),
-          barcode: r.raw_data?.barcode || r.raw_data?.raw_content || String(r.raw_data || ''),
+          barcode: String(r.raw_data?.barcode || r.raw_data?.raw_content || JSON.stringify(r.raw_data || '')),
           status: r.status as 'success' | 'failed' | 'pending',
-          error_message: r.error_message as string | undefined,
-          created_at: r.scan_time as string,
-          user_name: r.user_name as string | undefined,
+          error_message: r.error_message,
+          created_at: r.scan_time,
+          user_name: r.user_name,
         }));
         if (append) {
           setRecords(prev => [...prev, ...mappedRecords]);
@@ -94,7 +104,7 @@ export default function HistoryScreen() {
     }
   };
 
-  const renderItem = useCallback(({ item }: { item: ScanRecord }) => {
+  const renderItem = useCallback(({ item }: { item: MappedRecord }) => {
     const statusConfig = getStatusConfig(item.status);
     return (
       <View style={styles.recordCard}>

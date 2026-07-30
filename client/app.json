@@ -1,0 +1,64 @@
+{
+  "expo": {
+    "name": "扫码识别",
+    "slug": "saoma",
+    "version": "1.0.7",
+    "orientation": "portrait",
+    "icon": "./assets/images/icon.png",
+    "scheme": "myapp",
+    "userInterfaceStyle": "automatic",
+    "newArchEnabled": true,
+    "android": {
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/images/adaptive-icon.png",
+        "backgroundColor": "#ffffff"
+      },
+      "package": "com.saoma.app"
+    },
+    "web": {
+      "bundler": "metro",
+      "output": "single",
+      "favicon": "./assets/images/favicon.png"
+    },
+    "plugins": [
+      [
+        "expo-router",
+        {
+          "origin": "https://m55vxcm25q.coze.site"
+        }
+      ],
+      [
+        "expo-splash-screen",
+        {
+          "image": "./assets/images/splash-icon.png",
+          "imageWidth": 150,
+          "resizeMode": "contain",
+          "backgroundColor": "#0D9488"
+        }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "允许访问相册以便上传图片",
+          "cameraPermission": "允许使用相机拍照"
+        }
+      ],
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "允许访问相机以扫描二维码",
+          "microphonePermission": "允许访问麦克风以录制视频声音",
+          "recordAudioAndroid": true
+        }
+      ]
+    ],
+    "experiments": {
+      "typedRoutes": true
+    },
+    "extra": {
+      "eas": {
+        "projectId": "ae4f2f75-e6ba-4098-abc7-2fb7046b0779"
+      }
+    }
+  }
+}

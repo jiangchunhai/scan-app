@@ -313,7 +313,7 @@ export default function ScannerScreen() {
             <View style={styles.noPermission}>
               <FontAwesome6 name="camera" size={48} color="#78716C" />
               <Text style={styles.noPermissionText}>需要相机权限才能扫码</Text>
-              <TouchableOpacity style={styles.permissionButton} onPress={requestCameraPermission}>
+              <TouchableOpacity style={styles.permissionButton} onPress={requestPermission}>
                 <FontAwesome6 name="shield-halved" size={16} color="#FFF" />
                 <Text style={styles.permissionButtonText}>请求相机权限</Text>
               </TouchableOpacity>
