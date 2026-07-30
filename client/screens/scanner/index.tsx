@@ -10,6 +10,8 @@ import {
   Linking,
   Modal,
   ScrollView,
+  Alert,
+  TextInput,
 } from 'react-native';
 import { CameraView, useCameraPermissions, type BarcodeScanningResult } from 'expo-camera';
 import * as Haptics from 'expo-haptics';
@@ -41,6 +43,16 @@ export default function ScannerScreen() {
   const [tableRecords, setTableRecords] = useState<Array<{ index: number; value: string }>>([]);
   const [showTableModal, setShowTableModal] = useState(false);
   const [loadingTable, setLoadingTable] = useState(false);
+  const [showClearConfirm, setShowClearConfirm] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [clearing, setClearing] = useState(false);
+  const [showBatchTracking, setShowBatchTracking] = useState(false);
+  const [trackingNumber, setTrackingNumber] = useState('');
+  const [pendingRecords, setPendingRecords] = useState<Array<{ record_id: string; order_number: string }>>([]);
+  const [loadingPending, setLoadingPending] = useState(false);
+  const [batchSubmitting, setBatchSubmitting] = useState(false);
+  const [batchResult, setBatchResult] = useState<{ updated: number } | null>(null);
   const scanLineAnim = useRef(new Animated.Value(0)).current;
   const lastScanTime = useRef(0);
 
@@ -249,6 +261,124 @@ export default function ScannerScreen() {
     setPendingBarcode(null);
     setScanning(true);
   }, []);
+
+  const handleClearToday = useCallback(async () => {
+    setClearing(true);
+    try {
+      const response = await fetch(`${process.env.EXPO_PUBLIC_BACKEND_BASE_URL}/api/v1/feishu/clear-today`, {
+        method: 'DELETE',
+      });
+      const result = await response.json();
+      if (result.success) {
+        Alert.alert('清空成功', '今日数据已重置');
+        await fetchStats();
+      } else {
+        Alert.alert('清空失败', result.error || '未知错误');
+      }
+    } catch {
+      Alert.alert('清空失败', '网络错误');
+    } finally {
+      setClearing(false);
+      setShowClearConfirm(false);
+    }
+  }, [fetchStats]);
+
+  const handleDeleteLast = useCallback(async () => {
+    setIsDeleting(true);
+    try {
+      const response = await fetch(`${process.env.EXPO_PUBLIC_BACKEND_BASE_URL}/api/v1/feishu/delete-last`, {
+        method: 'DELETE',
+      });
+      const result = await response.json();
+      if (result.success) {
+        Alert.alert('删除成功', result.message || '已删除最后一条记录');
+        await fetchStats();
+        await fetchTableRecords();
+      } else {
+        Alert.alert('删除失败', result.error || '未知错误');
+      }
+    } catch {
+      Alert.alert('删除失败', '网络错误');
+    } finally {
+      setIsDeleting(false);
+      setShowDeleteConfirm(false);
+    }
+  }, [fetchStats, fetchTableRecords]);
+
+  // 加载待填写快递单号的记录
+  const loadPendingRecords = useCallback(async () => {
+    setLoadingPending(true);
+    try {
+      const configRes = await fetch(`${process.env.EXPO_PUBLIC_BACKEND_BASE_URL}/api/v1/feishu/config`);
+      const configData = await configRes.json();
+      if (!configData.success) {
+        Alert.alert('错误', '请先配置飞书');
+        return;
+      }
+      const config = configData.data;
+      const accessTokenRes = await fetch(`${process.env.EXPO_PUBLIC_BACKEND_BASE_URL}/api/v1/feishu/token`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ app_id: config.app_id || config.bitable_app_id, app_secret: config.app_secret || config.bitable_app_secret }),
+      });
+      const tokenData = await accessTokenRes.json();
+      if (!tokenData.success) {
+        Alert.alert('错误', '获取令牌失败');
+        return;
+      }
+      const accessToken = tokenData.data.token;
+      const appToken = config.app_token || config.bitable_app_token;
+      const tableId = config.table_id || config.bitable_table_id;
+
+      // 查询快递单号为空但1688订单编号有值的记录
+      const filter = `AND(CurrentValue.[快递单号]="",CurrentValue.[1688订单编号]<>"")`;
+      const recordsUrl = `https://open.feishu.cn/open-apis/bitable/v1/apps/${appToken}/tables/${tableId}/records/search?page_size=500&filter=${encodeURIComponent(filter)}`;
+      const recordsRes = await fetch(recordsUrl, {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({}),
+      });
+      const recordsData = await recordsRes.json();
+      if (recordsData.success) {
+        const items = (recordsData.data.items || []).map((item: any) => ({
+          record_id: item.record_id,
+          order_number: item.fields?.['1688订单编号'] || '',
+        }));
+        setPendingRecords(items);
+      }
+    } catch {
+      Alert.alert('错误', '加载失败');
+    } finally {
+      setLoadingPending(false);
+    }
+  }, []);
+
+  // 批量填写快递单号
+  const handleBatchSubmit = async () => {
+    if (!trackingNumber.trim()) {
+      Alert.alert('提示', '请输入或扫描快递单号');
+      return;
+    }
+    setBatchSubmitting(true);
+    try {
+      const response = await fetch(`${process.env.EXPO_PUBLIC_BACKEND_BASE_URL}/api/v1/feishu/batch-tracking`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ trackingNumber: trackingNumber.trim() }),
+      });
+      const result = await response.json();
+      if (result.success) {
+        setBatchResult({ updated: result.updated });
+        setTrackingNumber('');
+      } else {
+        Alert.alert('失败', result.error || '未知错误');
+      }
+    } catch {
+      Alert.alert('失败', '网络错误');
+    } finally {
+      setBatchSubmitting(false);
+    }
+  };
 
   const scanLineTranslateY = scanLineAnim.interpolate({
     inputRange: [0, 1],
@@ -478,16 +608,50 @@ export default function ScannerScreen() {
             </View>
           </View>
 
-          {/* Jump to Feishu Button */}
-          <TouchableOpacity
-            style={styles.feishuButton}
-            onPress={() => Linking.openURL(FEISHU_BITABLE_URL)}
-            activeOpacity={0.7}
-          >
-            <FontAwesome6 name="table-columns" size={16} color="#4F46E5" />
-            <Text style={styles.feishuButtonText}>查看飞书表格</Text>
-            <FontAwesome6 name="arrow-up-right-from-square" size={12} color="#4F46E5" />
-          </TouchableOpacity>
+          {/* Action Buttons - Consistent Spacing */}
+          <View style={styles.buttonGroup}>
+            {/* Batch Tracking Button */}
+            <TouchableOpacity
+              style={styles.batchButton}
+              onPress={() => { setShowBatchTracking(true); loadPendingRecords(); }}
+              activeOpacity={0.7}
+            >
+              <FontAwesome6 name="truck-fast" size={16} color="#059669" />
+              <Text style={styles.batchButtonText}>批量填写快递单号</Text>
+            </TouchableOpacity>
+
+            {/* Clear Data & Delete Last - Two Columns */}
+            <View style={styles.actionRow}>
+              <TouchableOpacity
+                style={styles.clearButton}
+                onPress={() => setShowClearConfirm(true)}
+                activeOpacity={0.7}
+              >
+                <FontAwesome6 name="rotate-left" size={14} color="#EF4444" />
+                <Text style={styles.clearButtonText}>清空数据</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={styles.deleteButton}
+                onPress={() => setShowDeleteConfirm(true)}
+                activeOpacity={0.7}
+              >
+                <FontAwesome6 name="trash-can" size={14} color="#EF4444" />
+                <Text style={styles.deleteButtonText}>删除上一条</Text>
+              </TouchableOpacity>
+            </View>
+
+            {/* View Feishu */}
+            <TouchableOpacity
+              style={styles.feishuButton}
+              onPress={() => Linking.openURL(FEISHU_BITABLE_URL)}
+              activeOpacity={0.7}
+            >
+              <FontAwesome6 name="table-columns" size={16} color="#4F46E5" />
+              <Text style={styles.feishuButtonText}>查看飞书</Text>
+              <FontAwesome6 name="arrow-up-right-from-square" size={12} color="#4F46E5" />
+            </TouchableOpacity>
+          </View>
         </View>
       </View>
 
@@ -527,6 +691,153 @@ export default function ScannerScreen() {
                 <Text style={styles.modalCloseText}>关闭</Text>
               </TouchableOpacity>
             </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Clear Confirmation Modal */}
+      <Modal
+        visible={showClearConfirm}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setShowClearConfirm(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.clearConfirmContent}>
+            <View style={styles.clearConfirmIcon}>
+              <FontAwesome6 name="triangle-exclamation" size={32} color="#EF4444" />
+            </View>
+            <Text style={styles.clearConfirmTitle}>确认清空今日数据？</Text>
+            <Text style={styles.clearConfirmDesc}>此操作将删除今日所有扫描记录，且无法恢复</Text>
+            <View style={styles.clearConfirmButtons}>
+              <TouchableOpacity
+                style={[styles.clearConfirmBtn, styles.clearConfirmCancelBtn]}
+                onPress={() => setShowClearConfirm(false)}
+                disabled={clearing}
+              >
+                <Text style={styles.clearConfirmCancelText}>取消</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.clearConfirmBtn, styles.clearConfirmDeleteBtn]}
+                onPress={handleClearToday}
+                disabled={clearing}
+              >
+                <Text style={styles.clearConfirmDeleteText}>
+                  {clearing ? '清空中...' : '确认清空'}
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Delete Last Record Confirmation Modal */}
+      <Modal
+        visible={showDeleteConfirm}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setShowDeleteConfirm(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.clearConfirmContent}>
+            <View style={styles.clearConfirmIcon}>
+              <FontAwesome6 name="triangle-exclamation" size={32} color="#EF4444" />
+            </View>
+            <Text style={styles.clearConfirmTitle}>确认删除最后一条记录？</Text>
+            <Text style={styles.clearConfirmDesc}>此操作将真实删除飞书表格中的最后一条记录，且无法恢复</Text>
+            <View style={styles.clearConfirmButtons}>
+              <TouchableOpacity
+                style={[styles.clearConfirmBtn, styles.clearConfirmCancelBtn]}
+                onPress={() => setShowDeleteConfirm(false)}
+                disabled={isDeleting}
+              >
+                <Text style={styles.clearConfirmCancelText}>取消</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.clearConfirmBtn, styles.clearConfirmDeleteBtn]}
+                onPress={handleDeleteLast}
+                disabled={isDeleting}
+              >
+                <Text style={styles.clearConfirmDeleteText}>
+                  {isDeleting ? '删除中...' : '确认删除'}
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Batch Tracking Modal */}
+      <Modal
+        visible={showBatchTracking}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setShowBatchTracking(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>批量填写快递单号</Text>
+              <TouchableOpacity onPress={() => { setShowBatchTracking(false); setBatchResult(null); }}>
+                <FontAwesome6 name="xmark" size={20} color="#6B7280" />
+              </TouchableOpacity>
+            </View>
+
+            {batchResult ? (
+              <View style={styles.batchResultContainer}>
+                <FontAwesome6 name="check-circle" size={48} color="#10B981" />
+                <Text style={styles.batchResultText}>成功填写 {batchResult.updated} 条</Text>
+                <TouchableOpacity
+                  style={styles.batchNewBtn}
+                  onPress={() => { setBatchResult(null); setTrackingNumber(''); loadPendingRecords(); }}
+                >
+                  <Text style={styles.batchNewBtnText}>继续填写</Text>
+                </TouchableOpacity>
+              </View>
+            ) : (
+              <>
+                <ScrollView style={styles.modalBody}>
+                  {loadingPending ? (
+                    <Text style={styles.modalEmptyText}>加载中...</Text>
+                  ) : pendingRecords.length === 0 ? (
+                    <Text style={styles.modalEmptyText}>没有待填写的记录</Text>
+                  ) : (
+                    <>
+                      <Text style={styles.batchPendingTitle}>待填写记录 ({pendingRecords.length}条)</Text>
+                      {pendingRecords.slice(0, 20).map((record) => (
+                        <View key={record.record_id} style={styles.recordRow}>
+                          <Text style={styles.recordIndex}>•</Text>
+                          <Text style={styles.recordValue} numberOfLines={1}>{record.order_number}</Text>
+                        </View>
+                      ))}
+                      {pendingRecords.length > 20 && (
+                        <Text style={styles.batchMoreText}>...还有 {pendingRecords.length - 20} 条</Text>
+                      )}
+                    </>
+                  )}
+                </ScrollView>
+
+                <View style={styles.batchInputContainer}>
+                  <TextInput
+                    style={styles.batchInput}
+                    placeholder="输入或扫描快递单号"
+                    placeholderTextColor="#9CA3AF"
+                    value={trackingNumber}
+                    onChangeText={setTrackingNumber}
+                    editable={!batchSubmitting}
+                  />
+                  <TouchableOpacity
+                    style={[styles.batchSubmitBtn, batchSubmitting && styles.batchSubmitBtnDisabled]}
+                    onPress={handleBatchSubmit}
+                    disabled={batchSubmitting || pendingRecords.length === 0}
+                  >
+                    <Text style={styles.batchSubmitBtnText}>
+                      {batchSubmitting ? '提交中...' : `填写${pendingRecords.length}条`}
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+              </>
+            )}
           </View>
         </View>
       </Modal>
@@ -946,11 +1257,11 @@ const styles = StyleSheet.create({
     fontWeight: '500',
   },
   feishuButton: {
+    flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 8,
-    marginTop: 16,
+    gap: 6,
     paddingVertical: 12,
     borderRadius: 14,
     backgroundColor: 'rgba(79, 70, 229, 0.08)',
@@ -1056,6 +1367,188 @@ const styles = StyleSheet.create({
     borderRadius: 10,
   },
   modalCloseText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#FFFFFF',
+  },
+  clearButton: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    paddingVertical: 12,
+    backgroundColor: '#FEF2F2',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#FEE2E2',
+  },
+  clearButtonText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#EF4444',
+  },
+  batchButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    paddingVertical: 12,
+    marginTop: 16,
+    marginBottom: 12,
+    backgroundColor: '#ECFDF5',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#D1FAE5',
+  },
+  batchButtonText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#059669',
+  },
+  deleteButton: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    paddingVertical: 14,
+    backgroundColor: '#FEF2F2',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#FECACA',
+  },
+  deleteButtonText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#DC2626',
+  },
+  actionRow: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+  buttonGroup: {
+    gap: 12,
+  },
+  clearConfirmContent: {
+    width: '85%',
+    backgroundColor: '#FFFFFF',
+    borderRadius: 20,
+    padding: 24,
+    alignItems: 'center',
+  },
+  clearConfirmIcon: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    backgroundColor: '#FEF2F2',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 16,
+  },
+  clearConfirmTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#111827',
+    marginBottom: 8,
+  },
+  clearConfirmDesc: {
+    fontSize: 14,
+    color: '#6B7280',
+    textAlign: 'center',
+    marginBottom: 24,
+    lineHeight: 20,
+  },
+  clearConfirmButtons: {
+    flexDirection: 'row',
+    gap: 12,
+    width: '100%',
+  },
+  clearConfirmBtn: {
+    flex: 1,
+    paddingVertical: 12,
+    borderRadius: 12,
+    alignItems: 'center',
+  },
+  clearConfirmCancelBtn: {
+    backgroundColor: '#F3F4F6',
+  },
+  clearConfirmCancelText: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: '#374151',
+  },
+  clearConfirmDeleteBtn: {
+    backgroundColor: '#EF4444',
+  },
+  clearConfirmDeleteText: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: '#FFFFFF',
+  },
+  batchPendingTitle: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#6B7280',
+    marginBottom: 8,
+  },
+  batchMoreText: {
+    fontSize: 12,
+    color: '#9CA3AF',
+    marginTop: 4,
+  },
+  batchResultContainer: {
+    alignItems: 'center',
+    paddingVertical: 40,
+    gap: 16,
+  },
+  batchResultText: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#059669',
+  },
+  batchNewBtn: {
+    marginTop: 8,
+    paddingHorizontal: 24,
+    paddingVertical: 12,
+    backgroundColor: '#ECFDF5',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#D1FAE5',
+  },
+  batchNewBtnText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#059669',
+  },
+  batchInputContainer: {
+    flexDirection: 'row',
+    gap: 8,
+    padding: 16,
+    borderTopWidth: 1,
+    borderTopColor: '#F3F4F6',
+  },
+  batchInput: {
+    flex: 1,
+    height: 44,
+    backgroundColor: '#F3F4F6',
+    borderRadius: 12,
+    paddingHorizontal: 16,
+    fontSize: 15,
+    color: '#111827',
+  },
+  batchSubmitBtn: {
+    paddingHorizontal: 20,
+    height: 44,
+    backgroundColor: '#059669',
+    borderRadius: 12,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  batchSubmitBtnDisabled: {
+    backgroundColor: '#9CA3AF',
+  },
+  batchSubmitBtnText: {
     fontSize: 14,
     fontWeight: '600',
     color: '#FFFFFF',

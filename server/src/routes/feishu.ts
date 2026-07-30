@@ -445,4 +445,169 @@ router.get('/table-records', async (req: Request, res: Response) => {
   }
 });
 
+/**
+ * 清空今日扫描记录
+ * DELETE /api/v1/feishu/clear-today
+ */
+router.delete('/clear-today', async (req, res) => {
+  try {
+    const client = getSupabaseClient();
+    const today = new Date().toISOString().split('T')[0];
+
+    const { error } = await client
+      .from('scan_records')
+      .delete()
+      .gte('created_at', `${today}T00:00:00`)
+      .lt('created_at', `${today}T23:59:59`);
+
+    if (error) throw new Error(`清空记录失败: ${error.message}`);
+
+    res.json({
+      success: true,
+      message: '今日数据已清空',
+    });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : '清空数据失败';
+    res.status(500).json({ success: false, error: message });
+  }
+});
+
+/**
+ * 批量填写快递单号
+ * POST /api/v1/feishu/batch-tracking
+ * Body: trackingNumber: string
+ */
+router.post('/batch-tracking', async (req, res) => {
+  try {
+    const { trackingNumber } = req.body;
+
+    if (!trackingNumber) {
+      return res.status(400).json({ success: false, error: '请提供快递单号' });
+    }
+
+    // 获取飞书配置
+    const config = await getFeishuConfig();
+    if (!config) {
+      return res.status(400).json({ success: false, error: '请先配置飞书' });
+    }
+
+    const accessToken = await getTenantAccessToken(config.app_id, config.app_secret);
+
+    // 查询表格中需要更新的记录（快递单号为空 + 1688订单编号有值）
+    const filter = `AND(CurrentValue.[快递单号]="",CurrentValue.[1688订单编号]<>"")`;
+    const recordsUrl = `https://open.feishu.cn/open-apis/bitable/v1/apps/${config.app_token}/tables/${config.table_id}/records/search?page_size=500&filter=${encodeURIComponent(filter)}`;
+
+    const recordsRes = await fetch(recordsUrl, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${accessToken}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({}),
+    });
+
+    const recordsData = await recordsRes.json();
+    if (!recordsData.success) {
+      throw new Error(`查询记录失败: ${recordsData.msg}`);
+    }
+
+    const items = recordsData.data.items || [];
+    if (items.length === 0) {
+      return res.json({ success: true, updated: 0, message: '没有需要更新的记录' });
+    }
+
+    // 批量更新快递单号
+    const updateRecords = items.map((item: any) => ({
+      record_id: item.record_id,
+      fields: {
+        '快递单号': trackingNumber,
+      },
+    }));
+
+    const updateUrl = `https://open.feishu.cn/open-apis/bitable/v1/apps/${config.app_token}/tables/${config.table_id}/records/batch_update`;
+    const updateRes = await fetch(updateUrl, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${accessToken}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ records: updateRecords }),
+    });
+
+    const updateData = await updateRes.json();
+    if (!updateData.success) {
+      throw new Error(`更新失败: ${updateData.msg}`);
+    }
+
+    res.json({
+      success: true,
+      updated: items.length,
+      message: `成功填写${items.length}条记录`,
+    });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : '批量填写失败';
+    res.status(500).json({ success: false, error: message });
+  }
+});
+
+/**
+ * 删除飞书表格最后一条记录
+ * POST /api/v1/feishu/delete-last
+ */
+router.post('/delete-last', async (req, res) => {
+  try {
+    const client = getSupabaseClient();
+    const { data: config } = await client
+      .from('feishu_config')
+      .select('*')
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .single();
+
+    if (!config) {
+      throw new Error('请先配置飞书');
+    }
+
+    const tokenRes = await fetch('https://open.feishu.cn/open-apis/auth/v3/tenant_access_token/internal', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ app_id: config.app_id, app_secret: config.app_secret }),
+    });
+    const tokenData = await tokenRes.json();
+    if (!tokenData.tenant_access_token) {
+      throw new Error('获取飞书凭证失败');
+    }
+    const accessToken = tokenData.tenant_access_token;
+
+    const listUrl = `https://open.feishu.cn/open-apis/bitable/v1/apps/${config.app_token}/tables/${config.table_id}/records?page_size=1&sort=[{"field_name":"ID","direction":"desc"}]`;
+    const listRes = await fetch(listUrl, {
+      headers: { 'Authorization': `Bearer ${accessToken}` },
+    });
+    const listData = await listRes.json();
+    if (!listData.data?.items?.length) {
+      throw new Error('没有可删除的记录');
+    }
+
+    const lastRecord = listData.data.items[0];
+    const deleteUrl = `https://open.feishu.cn/open-apis/bitable/v1/apps/${config.app_token}/tables/${config.table_id}/records/${lastRecord.record_id}`;
+    const deleteRes = await fetch(deleteUrl, {
+      method: 'DELETE',
+      headers: { 'Authorization': `Bearer ${accessToken}` },
+    });
+    const deleteData = await deleteRes.json();
+    if (!deleteData.success) {
+      throw new Error(`删除失败: ${deleteData.msg}`);
+    }
+
+    res.json({
+      success: true,
+      message: '删除成功',
+      record_id: lastRecord.record_id,
+    });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : '删除失败';
+    res.status(500).json({ success: false, error: message });
+  }
+});
+
 export default router;
