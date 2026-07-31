@@ -318,45 +318,20 @@ export default function ScannerScreen() {
   const loadPendingRecords = useCallback(async () => {
     setLoadingPending(true);
     try {
-      const configRes = await fetch(`${process.env.EXPO_PUBLIC_BACKEND_BASE_URL}/api/v1/feishu/config`);
-      const configData = await configRes.json();
-      if (!configData.success) {
-        Alert.alert('错误', '请先配置飞书');
-        return;
-      }
-      const config = configData.data;
-      const accessTokenRes = await fetch(`${process.env.EXPO_PUBLIC_BACKEND_BASE_URL}/api/v1/feishu/token`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ app_id: config.app_id || config.bitable_app_id, app_secret: config.app_secret || config.bitable_app_secret }),
-      });
-      const tokenData = await accessTokenRes.json();
-      if (!tokenData.success) {
-        Alert.alert('错误', '获取令牌失败');
-        return;
-      }
-      const accessToken = tokenData.data.token;
-      const appToken = config.app_token || config.bitable_app_token;
-      const tableId = config.table_id || config.bitable_table_id;
-
-      // 查询快递单号为空但1688订单编号有值的记录
-      const filter = `AND(CurrentValue.[快递单号]="",CurrentValue.[1688订单编号]<>"")`;
-      const recordsUrl = `https://open.feishu.cn/open-apis/bitable/v1/apps/${appToken}/tables/${tableId}/records/search?page_size=500&filter=${encodeURIComponent(filter)}`;
-      const recordsRes = await fetch(recordsUrl, {
-        method: 'POST',
-        headers: { 'Authorization': `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify({}),
-      });
-      const recordsData = await recordsRes.json();
-      if (recordsData.success) {
-        const items = (recordsData.data.items || []).map((item: any) => ({
-          record_id: item.record_id,
-          order_number: item.fields?.['1688订单编号'] || '',
-        }));
-        setPendingRecords(items);
+      /**
+       * 服务端文件：server/src/routes/feishu.ts
+       * 接口：GET /api/v1/feishu/pending-records
+       * 返回：{ success: true, data: { records: [...], count: number } }
+       */
+      const response = await fetch(`${process.env.EXPO_PUBLIC_BACKEND_BASE_URL}/api/v1/feishu/pending-records`);
+      const result = await response.json();
+      if (result.success) {
+        setPendingRecords(result.data.records || []);
+      } else {
+        Alert.alert('错误', result.error || '加载失败');
       }
     } catch {
-      Alert.alert('错误', '加载失败');
+      Alert.alert('错误', '网络错误');
     } finally {
       setLoadingPending(false);
     }
