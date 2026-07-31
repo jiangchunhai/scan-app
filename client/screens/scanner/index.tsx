@@ -40,6 +40,7 @@ export default function ScannerScreen() {
   const [pendingBarcode, setPendingBarcode] = useState<string | null>(null);
   const [stats, setStats] = useState<Stats>({ total: 0, today: 0, success: 0, today_success: 0, failed: 0 });
   const [configReady, setConfigReady] = useState(false);
+  const [configChecking, setConfigChecking] = useState(true);
   const [tableRecords, setTableRecords] = useState<Array<{ index: number; value: string }>>([]);
   const [showTableModal, setShowTableModal] = useState(false);
   const [loadingTable, setLoadingTable] = useState(false);
@@ -147,12 +148,15 @@ export default function ScannerScreen() {
 
   // Check if Feishu config exists
   const checkConfig = useCallback(async () => {
+    setConfigChecking(true);
     try {
       const response = await fetch(`${process.env.EXPO_PUBLIC_BACKEND_BASE_URL}/api/v1/feishu/config`);
       const result = await response.json() as { success: boolean; data: unknown };
       setConfigReady(!!result.data);
     } catch {
       setConfigReady(false);
+    } finally {
+      setConfigChecking(false);
     }
   }, []);
 
@@ -201,6 +205,13 @@ export default function ScannerScreen() {
     setPendingBarcode(null);
     setIsProcessing(true);
 
+    // Optimistic update: show success immediately
+    setLastScan({ barcode: data, status: 'success' });
+    if (Platform.OS !== 'web') {
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    }
+
+    // Sync to Feishu in background (fire-and-forget)
     try {
       /**
        * 服务端文件：部署后端 /api/v1/feishu/scan
@@ -220,30 +231,27 @@ export default function ScannerScreen() {
         data?: { barcode?: string; status: string; raw_data?: { barcode: string } };
       };
 
-      if (result.success) {
-        const isDuplicate = result.data?.status === 'duplicate';
-        const barcode = result.data?.raw_data?.barcode || result.data?.barcode || data;
-        setLastScan({
-          barcode,
-          status: isDuplicate ? 'duplicate' : 'success',
-          error: isDuplicate ? result.message : undefined,
-        });
-        if (Platform.OS !== 'web') {
-          Haptics.notificationAsync(
-            isDuplicate
-              ? Haptics.NotificationFeedbackType.Warning
-              : Haptics.NotificationFeedbackType.Success
-          );
-        }
-      } else {
+      if (!result.success) {
+        // Update status if sync failed
         setLastScan({ barcode: data, status: 'failed', error: result.error });
         if (Platform.OS !== 'web') {
           Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
         }
+      } else if (result.data?.status === 'duplicate') {
+        // Update status if duplicate
+        setLastScan({
+          barcode: result.data?.raw_data?.barcode || result.data?.barcode || data,
+          status: 'duplicate',
+          error: result.message,
+        });
+        if (Platform.OS !== 'web') {
+          Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+        }
       }
 
+      // Refresh stats and table records in background
       fetchStats();
-      fetchTableRecords(); // Refresh table records for duplicate detection
+      loadTableRecordsForDedup();
     } catch (err) {
       const errorMsg = err instanceof Error ? err.message : '网络请求失败';
       setLastScan({ barcode: data, status: 'failed', error: errorMsg });
@@ -255,7 +263,7 @@ export default function ScannerScreen() {
       // Resume scanning immediately
       setScanning(true);
     }
-  }, [pendingBarcode, fetchStats]);
+  }, [pendingBarcode, fetchStats, loadTableRecordsForDedup]);
 
   const handleCancelScan = useCallback(() => {
     setPendingBarcode(null);
@@ -272,6 +280,7 @@ export default function ScannerScreen() {
       if (result.success) {
         Alert.alert('清空成功', '今日数据已重置');
         await fetchStats();
+        await loadTableRecordsForDedup(); // Silent refresh (no modal)
       } else {
         Alert.alert('清空失败', result.error || '未知错误');
       }
@@ -281,7 +290,7 @@ export default function ScannerScreen() {
       setClearing(false);
       setShowClearConfirm(false);
     }
-  }, [fetchStats]);
+  }, [fetchStats, loadTableRecordsForDedup]);
 
   const handleDeleteLast = useCallback(async () => {
     setIsDeleting(true);
@@ -293,7 +302,7 @@ export default function ScannerScreen() {
       if (result.success) {
         Alert.alert('删除成功', result.message || '已删除最后一条记录');
         await fetchStats();
-        await fetchTableRecords();
+        await loadTableRecordsForDedup(); // Silent refresh (no modal)
       } else {
         Alert.alert('删除失败', result.error || '未知错误');
       }
@@ -410,8 +419,14 @@ export default function ScannerScreen() {
           </View>
         </View>
 
-        {/* Camera Viewfinder */}
-        <View style={styles.cameraSection}>
+        {/* Scrollable Content */}
+        <ScrollView
+          style={styles.scrollContent}
+          contentContainerStyle={styles.scrollContentContainer}
+          showsVerticalScrollIndicator={false}
+        >
+          {/* Camera Viewfinder */}
+          <View style={styles.cameraSection}>
           {hasPermission ? (
             <View style={styles.cameraContainer}>
               <CameraView
@@ -458,7 +473,7 @@ export default function ScannerScreen() {
                   </Text>
                 </View>
               )}
-              {!configReady && (
+              {!configChecking && !configReady && (
                 <View style={styles.configWarning}>
                   <FontAwesome6 name="triangle-exclamation" size={14} color="#F59E0B" />
                   <Text style={styles.configWarningText}>
@@ -653,6 +668,7 @@ export default function ScannerScreen() {
             </TouchableOpacity>
           </View>
         </View>
+        </ScrollView>
       </View>
 
       {/* Table Records Modal */}
@@ -702,7 +718,7 @@ export default function ScannerScreen() {
         animationType="fade"
         onRequestClose={() => setShowClearConfirm(false)}
       >
-        <View style={styles.modalOverlay}>
+        <View style={styles.confirmOverlay}>
           <View style={styles.clearConfirmContent}>
             <View style={styles.clearConfirmIcon}>
               <FontAwesome6 name="triangle-exclamation" size={32} color="#EF4444" />
@@ -738,7 +754,7 @@ export default function ScannerScreen() {
         animationType="fade"
         onRequestClose={() => setShowDeleteConfirm(false)}
       >
-        <View style={styles.modalOverlay}>
+        <View style={styles.confirmOverlay}>
           <View style={styles.clearConfirmContent}>
             <View style={styles.clearConfirmIcon}>
               <FontAwesome6 name="triangle-exclamation" size={32} color="#EF4444" />
@@ -785,7 +801,7 @@ export default function ScannerScreen() {
 
             {batchResult ? (
               <View style={styles.batchResultContainer}>
-                <FontAwesome6 name="check-circle" size={48} color="#10B981" />
+                <FontAwesome6 name="circle-check" size={48} color="#10B981" />
                 <Text style={styles.batchResultText}>成功填写 {batchResult.updated} 条</Text>
                 <TouchableOpacity
                   style={styles.batchNewBtn}
@@ -850,10 +866,16 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#F5F5F4',
   },
+  scrollContent: {
+    flex: 1,
+  },
+  scrollContentContainer: {
+    paddingBottom: 40,
+  },
   header: {
     backgroundColor: '#F5F5F4',
     paddingHorizontal: 20,
-    paddingBottom: 12,
+    paddingBottom: 40,
   },
   headerContent: {
     flexDirection: 'row',
@@ -1041,7 +1063,6 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(0,0,0,0.5)',
     justifyContent: 'center',
     alignItems: 'center',
-    paddingHorizontal: 32,
   },
   confirmCard: {
     width: '100%',
