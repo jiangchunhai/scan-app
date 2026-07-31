@@ -296,7 +296,7 @@ export default function ScannerScreen() {
     setIsDeleting(true);
     try {
       const response = await fetch(`${process.env.EXPO_PUBLIC_BACKEND_BASE_URL}/api/v1/feishu/delete-last`, {
-        method: 'DELETE',
+        method: 'POST',
       });
       const result = await response.json();
       if (result.success) {
