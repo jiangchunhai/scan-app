@@ -452,7 +452,7 @@ export default function ScannerScreen() {
               <CameraView
                 style={styles.camera}
                 cameraType="back"
-                barcodeScannerSettings={{
+                barcodeScanner={{
                   barcodeTypes: ['code128', 'code39', 'code93', 'ean13', 'ean8', 'upc_a', 'upc_e', 'qr'],
                 }}
                 onBarcodeScanned={scanning ? handleBarcodeScanned : undefined}
@@ -863,7 +863,7 @@ export default function ScannerScreen() {
                     editable={!batchSubmitting}
                   />
                   <TouchableOpacity
-                    style={styles.batchScanButton}
+                    style={styles.batchButton}
                     onPress={handleBatchScan}
                     disabled={batchSubmitting}
                   >
@@ -903,7 +903,7 @@ export default function ScannerScreen() {
             <CameraView
               style={styles.scanner}
               cameraType="back"
-              barcodeScannerSettings={{
+              barcodeScanner={{
                 barcodeTypes: ['qr', 'ean13', 'ean8', 'code128', 'code39', 'upc_a', 'upc_e'],
               }}
               onBarcodeScanned={handleBatchBarcodeScanned}
