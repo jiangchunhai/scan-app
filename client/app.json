@@ -13,7 +13,11 @@
         "foregroundImage": "./assets/images/adaptive-icon.png",
         "backgroundColor": "#ffffff"
       },
-      "package": "com.saoma.app"
+      "package": "com.saoma.app",
+      "permissions": [
+        "android.permission.RECORD_AUDIO",
+        "android.permission.CAMERA"
+      ]
     },
     "web": {
       "bundler": "metro",
@@ -56,9 +60,13 @@
       "typedRoutes": true
     },
     "extra": {
+      "router": {
+        "origin": "https://m55vxcm25q.coze.site"
+      },
       "eas": {
-        "projectId": "ae4f2f75-e6ba-4098-abc7-2fb7046b0779"
+        "projectId": "ba8b7a03-df39-480c-9f9a-086eade7e7dc"
       }
-    }
+    },
+    "owner": "jiangchunhai123"
   }
 }
