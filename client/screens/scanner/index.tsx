@@ -54,6 +54,8 @@ export default function ScannerScreen() {
   const [loadingPending, setLoadingPending] = useState(false);
   const [batchSubmitting, setBatchSubmitting] = useState(false);
   const [batchResult, setBatchResult] = useState<{ updated: number } | null>(null);
+  const [showTrackingScanModal, setShowTrackingScanModal] = useState(false);
+  const [trackingScanResult, setTrackingScanResult] = useState<string | null>(null);
   const scanLineAnim = useRef(new Animated.Value(0)).current;
   const lastScanTime = useRef(0);
 
@@ -363,6 +365,44 @@ export default function ScannerScreen() {
       setBatchSubmitting(false);
     }
   };
+
+  // 扫码填写快递单号
+  const handleTrackingScan = useCallback(async (barcode: string) => {
+    setTrackingScanResult(null);
+    setBatchSubmitting(true);
+    try {
+      /**
+       * 服务端文件：server/src/routes/feishu.ts
+       * 接口：POST /api/v1/feishu/batch-tracking
+       * Body 参数：trackingNumber: string
+       */
+      const response = await fetch(`${process.env.EXPO_PUBLIC_BACKEND_BASE_URL}/api/v1/feishu/batch-tracking`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ trackingNumber: barcode }),
+      });
+      const result = await response.json();
+      if (result.success) {
+        setTrackingScanResult(`成功填写 ${result.data.updated_count} 条记录`);
+        setShowTrackingScanModal(false);
+        loadPendingRecords();
+        fetchStats();
+        setTimeout(() => setTrackingScanResult(null), 3000);
+      } else {
+        Alert.alert('错误', result.error || '填写失败');
+      }
+    } catch {
+      Alert.alert('错误', '网络错误');
+    } finally {
+      setBatchSubmitting(false);
+    }
+  }, [loadPendingRecords, fetchStats]);
+
+  // 扫码 Modal 扫码成功回调
+  const handleBatchBarcodeScanned = useCallback((barcode: string) => {
+    setBatchTrackingNumber(barcode);
+    setShowTrackingScanModal(false);
+  }, []);
 
   const scanLineTranslateY = scanLineAnim.interpolate({
     inputRange: [0, 1],
@@ -818,6 +858,13 @@ export default function ScannerScreen() {
                     editable={!batchSubmitting}
                   />
                   <TouchableOpacity
+                    style={styles.batchScanBtn}
+                    onPress={handleBatchScan}
+                    disabled={batchSubmitting}
+                  >
+                    <FontAwesome6 name="barcode" size={20} color="#6366F1" />
+                  </TouchableOpacity>
+                  <TouchableOpacity
                     style={[styles.batchSubmitBtn, batchSubmitting && styles.batchSubmitBtnDisabled]}
                     onPress={handleBatchSubmit}
                     disabled={batchSubmitting || pendingRecords.length === 0}
@@ -829,6 +876,37 @@ export default function ScannerScreen() {
                 </View>
               </>
             )}
+          </View>
+        </View>
+      </Modal>
+
+      {/* 扫码填写快递单号 Modal */}
+      <Modal
+        visible={showBatchScanner}
+        animationType="slide"
+        onRequestClose={() => setShowBatchScanner(false)}
+      >
+        <View style={styles.scannerModalContainer}>
+          <View style={styles.scannerModalHeader}>
+            <Text style={styles.scannerModalTitle}>扫描快递单号</Text>
+            <TouchableOpacity onPress={() => setShowBatchScanner(false)}>
+              <FontAwesome6 name="xmark" size={20} color="#6B7280" />
+            </TouchableOpacity>
+          </View>
+
+          <View style={styles.scannerContainer}>
+            <CameraView
+              style={styles.scanner}
+              facing="back"
+              barcodeScannerSettings={{
+                barcodeTypes: ['qr', 'ean13', 'ean8', 'code128', 'code39', 'upc_a', 'upc_e'],
+              }}
+              onBarcodeScanned={handleBatchBarcodeScanned}
+            />
+            <View style={styles.scannerOverlay}>
+              <View style={styles.scannerFrame} />
+            </View>
+            <Text style={styles.scannerHint}>将快递单号条形码放入框内</Text>
           </View>
         </View>
       </Modal>
@@ -1547,5 +1625,51 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '600',
     color: '#FFFFFF',
+  },
+  scannerModalContainer: {
+    flex: 1,
+    backgroundColor: '#000000',
+  },
+  scannerModalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: 16,
+    backgroundColor: '#1F2937',
+  },
+  scannerModalTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#FFFFFF',
+  },
+  scannerContainer: {
+    flex: 1,
+    position: 'relative',
+  },
+  scanner: {
+    flex: 1,
+  },
+  scannerOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  scannerFrame: {
+    width: 250,
+    height: 250,
+    borderWidth: 2,
+    borderColor: '#10B981',
+    borderRadius: 16,
+  },
+  scannerHint: {
+    position: 'absolute',
+    bottom: 60,
+    left: 0,
+    right: 0,
+    textAlign: 'center',
+    fontSize: 14,
+    color: '#FFFFFF',
+    backgroundColor: 'rgba(0,0,0,0.6)',
+    padding: 12,
   },
 });

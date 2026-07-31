@@ -490,6 +490,52 @@ router.delete('/clear-today', async (req, res) => {
   }
 });
 
+
+/**
+ * 获取待填写快递单号的记录
+ * GET /api/v1/feishu/pending-records
+ * 返回：1688 订单编号有值但快递单号为空的记录
+ */
+router.get('/pending-records', async (req, res) => {
+  try {
+    // 获取飞书配置
+    const config = await getFeishuConfig();
+    if (!config) {
+      return res.status(400).json({ success: false, error: '请先配置飞书' });
+    }
+
+    const accessToken = await getTenantAccessToken(config.app_id, config.app_secret);
+
+    // 查询表格中待填写的记录（快递单号为空 + 1688 订单编号有值）
+    const filter = `CurrentValue.[快递单号]="" AND CurrentValue.[1688 订单编号]<>""`;
+    const recordsUrl = `https://open.feishu.cn/open-apis/bitable/v1/apps/${config.app_token}/tables/${config.table_id}/records/search?page_size=500&filter=${encodeURIComponent(filter)}`;
+
+    const recordsRes = await fetch(recordsUrl, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${accessToken}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({}),
+    });
+
+    const recordsData = await recordsRes.json() as { success: boolean; msg?: string; data?: { items?: Array<{ record_id: string; fields: Record<string, unknown> }> } };
+    if (!recordsData.success) {
+      throw new Error(`查询记录失败：${recordsData.msg}`);
+    }
+
+    const items = recordsData.data?.items || [];
+    const records = items.map(item => ({
+      record_id: item.record_id,
+      order_number: item.fields['1688 订单编号'] as string || '',
+    }));
+
+    res.json({ success: true, data: { records, count: records.length } });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : '获取待填写记录失败';
+    res.status(500).json({ success: false, error: message });
+  }
+});
 /**
  * 批量填写快递单号
  * POST /api/v1/feishu/batch-tracking
