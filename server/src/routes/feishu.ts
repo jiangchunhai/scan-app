@@ -40,6 +40,24 @@ async function getTenantAccessToken(appId: string, appSecret: string): Promise<s
 }
 
 /**
+ * Get Feishu configuration from database
+ */
+async function getFeishuConfig(): Promise<{ app_id: string; app_secret: string; app_token: string; table_id: string; field_name?: string } | null> {
+  const client = getSupabaseClient();
+  const { data, error } = await client
+    .from('feishu_config')
+    .select('app_id, app_secret, app_token, table_id, field_name')
+    .order('updated_at', { ascending: false })
+    .limit(1);
+
+  if (error || !data || data.length === 0) {
+    return null;
+  }
+
+  return data[0];
+}
+
+/**
  * GET /api/v1/feishu/config
  * Get current Feishu configuration
  */
@@ -506,12 +524,12 @@ router.post('/batch-tracking', async (req, res) => {
       body: JSON.stringify({}),
     });
 
-    const recordsData = await recordsRes.json();
+    const recordsData = await recordsRes.json() as { success: boolean; msg?: string; data?: { items?: Array<{ record_id: string; fields: Record<string, unknown> }> } };
     if (!recordsData.success) {
       throw new Error(`查询记录失败: ${recordsData.msg}`);
     }
 
-    const items = recordsData.data.items || [];
+    const items = recordsData.data?.items || [];
     if (items.length === 0) {
       return res.json({ success: true, updated: 0, message: '没有需要更新的记录' });
     }
@@ -534,7 +552,7 @@ router.post('/batch-tracking', async (req, res) => {
       body: JSON.stringify({ records: updateRecords }),
     });
 
-    const updateData = await updateRes.json();
+    const updateData = await updateRes.json() as { success: boolean; msg?: string };
     if (!updateData.success) {
       throw new Error(`更新失败: ${updateData.msg}`);
     }
@@ -573,7 +591,7 @@ router.post('/delete-last', async (req, res) => {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ app_id: config.app_id, app_secret: config.app_secret }),
     });
-    const tokenData = await tokenRes.json();
+    const tokenData = await tokenRes.json() as { tenant_access_token?: string; code?: number; msg?: string };
     if (!tokenData.tenant_access_token) {
       throw new Error('获取飞书凭证失败');
     }
@@ -583,7 +601,7 @@ router.post('/delete-last', async (req, res) => {
     const listRes = await fetch(listUrl, {
       headers: { 'Authorization': `Bearer ${accessToken}` },
     });
-    const listData = await listRes.json();
+    const listData = await listRes.json() as { data?: { items?: Array<{ record_id: string }> }; success?: boolean; msg?: string };
     if (!listData.data?.items?.length) {
       throw new Error('没有可删除的记录');
     }
@@ -594,7 +612,7 @@ router.post('/delete-last', async (req, res) => {
       method: 'DELETE',
       headers: { 'Authorization': `Bearer ${accessToken}` },
     });
-    const deleteData = await deleteRes.json();
+    const deleteData = await deleteRes.json() as { success: boolean; msg?: string };
     if (!deleteData.success) {
       throw new Error(`删除失败: ${deleteData.msg}`);
     }
