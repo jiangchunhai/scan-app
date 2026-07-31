@@ -575,17 +575,22 @@ router.post('/batch-tracking', async (req, res) => {
 
     const accessToken = await getTenantAccessToken(config.app_id, config.app_secret);
 
-    // 查询表格中需要更新的记录（快递单号为空 + 1688订单编号有值）
-    const filter = `AND(CurrentValue.[快递单号]="",CurrentValue.[1688订单编号]<>"")`;
-    const recordsUrl = `https://open.feishu.cn/open-apis/bitable/v1/apps/${config.app_token}/tables/${config.table_id}/records/search?page_size=500&filter=${encodeURIComponent(filter)}`;
-
+    // 查询表格中需要更新的记录（快递单号为空 + 1688 订单编号有值）
+    const filter = JSON.stringify({
+      conjunction: 'and',
+      conditions: [
+        { field_name: '快递单号', operator: 'isEmpty', value: [] },
+        { field_name: '1688 订单编号', operator: 'isNotEmpty', value: [] },
+      ],
+    });
+    const recordsUrl = `https://open.feishu.cn/open-apis/bitable/v1/apps/${config.app_token}/tables/${config.table_id}/records/search?page_size=500`;
     const recordsRes = await fetch(recordsUrl, {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${accessToken}`,
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({}),
+      body: JSON.stringify({ filter }),
     });
 
     const recordsData = await recordsRes.json() as { success: boolean; msg?: string; data?: { items?: Array<{ record_id: string; fields: Record<string, unknown> }> } };
