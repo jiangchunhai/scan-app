@@ -1,0 +1,46 @@
+name: EAS Build APK
+
+on:
+  workflow_dispatch:  # 手动触发
+  push:
+    branches: [main]  # 推送到 main 分支时自动触发
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
+      - name: Install dependencies
+        run: |
+          cd client && pnpm install
+          cd ../server && pnpm install
+
+      - name: Setup EAS
+        uses: expo/expo-github-action@v8
+        with:
+          eas-version: latest
+          token: ${{ secrets.EXPO_TOKEN }}
+
+      - name: Build APK
+        run: |
+          cd client
+          eas build --platform android --profile preview --non-interactive --no-wait
+
+      - name: Get build URL
+        run: |
+          cd client
+          BUILD_URL=$(eas build:list --limit 1 --json 2>/dev/null | jq -r '.[0].platformBuildUrl // .[0].artifactUrl // "Check EAS Dashboard"')
+          echo "Build URL: $BUILD_URL"
+          echo "Check https://expo.dev/accounts/jiangchunhais-team/projects/scan-app/builds for your APK"
