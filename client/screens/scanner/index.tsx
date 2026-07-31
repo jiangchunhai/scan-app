@@ -361,7 +361,7 @@ export default function ScannerScreen() {
       });
       const result = await response.json();
       if (result.success) {
-        setBatchResult({ updated: result.updated });
+        setBatchResult({ updated: result.data?.updated_count || 0 });
         setTrackingNumber('');
       } else {
         Alert.alert('失败', result.error || '未知错误');
