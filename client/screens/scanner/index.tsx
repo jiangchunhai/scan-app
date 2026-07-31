@@ -12,6 +12,9 @@ import {
   ScrollView,
   Alert,
   TextInput,
+  KeyboardAvoidingView,
+  TouchableWithoutFeedback,
+  Keyboard,
 } from 'react-native';
 import { CameraView, useCameraPermissions, type BarcodeScanningResult } from 'expo-camera';
 import * as Haptics from 'expo-haptics';
@@ -55,6 +58,8 @@ export default function ScannerScreen() {
   const [batchSubmitting, setBatchSubmitting] = useState(false);
   const [batchResult, setBatchResult] = useState<{ updated: number } | null>(null);
   const [showTrackingScanModal, setShowTrackingScanModal] = useState(false);
+  const [lastScannedBarcode, setLastScannedBarcode] = useState('');
+  const [isFocused, setIsFocused] = useState(false);
   const [trackingScanResult, setTrackingScanResult] = useState<string | null>(null);
   const scanLineAnim = useRef(new Animated.Value(0)).current;
   const lastScanTime = useRef(0);
@@ -399,10 +404,15 @@ export default function ScannerScreen() {
   }, [loadPendingRecords, fetchStats]);
 
   // 扫码 Modal 扫码成功回调
-  const handleBatchBarcodeScanned = useCallback((barcode: string) => {
-    setTrackingNumber(barcode);
+  const handleBatchBarcodeScanned = useCallback(({ data }: { data: string }) => {
+    // 防止重复扫描同一个条码
+    if (data === lastScannedBarcode) {
+      return;
+    }
+    setLastScannedBarcode(data);
+    setTrackingNumber(data);
     setShowTrackingScanModal(false);
-  }, []);
+  }, [lastScannedBarcode]);
 
   // 打开扫码 Modal
   const handleBatchScan = useCallback(() => {
@@ -451,10 +461,7 @@ export default function ScannerScreen() {
             <View style={styles.cameraContainer}>
               <CameraView
                 style={styles.camera}
-                cameraType="back"
-                barcodeScanner={{
-                  barcodeTypes: ['code128', 'code39', 'code93', 'ean13', 'ean8', 'upc_a', 'upc_e', 'qr'],
-                }}
+                facing="back"
                 onBarcodeScanned={scanning ? handleBarcodeScanned : undefined}
               />
               {/* Scan overlay */}
@@ -810,14 +817,20 @@ export default function ScannerScreen() {
         animationType="slide"
         onRequestClose={() => setShowBatchTracking(false)}
       >
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>批量填写快递单号</Text>
-              <TouchableOpacity onPress={() => { setShowBatchTracking(false); setBatchResult(null); }}>
-                <FontAwesome6 name="xmark" size={20} color="#6B7280" />
-              </TouchableOpacity>
-            </View>
+        <KeyboardAvoidingView
+          style={{ flex: 1 }}
+          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+          keyboardVerticalOffset={100}
+        >
+          <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
+            <View style={styles.modalOverlay}>
+              <View style={styles.modalContent}>
+                <View style={styles.modalHeader}>
+                  <Text style={styles.modalTitle}>批量填写快递单号</Text>
+                  <TouchableOpacity onPress={() => { setShowBatchTracking(false); setBatchResult(null); }}>
+                    <FontAwesome6 name="xmark" size={20} color="#6B7280" />
+                  </TouchableOpacity>
+                </View>
 
             {batchResult ? (
               <View style={styles.batchResultContainer}>
@@ -883,6 +896,8 @@ export default function ScannerScreen() {
             )}
           </View>
         </View>
+          </TouchableWithoutFeedback>
+        </KeyboardAvoidingView>
       </Modal>
 
       {/* 扫码填写快递单号 Modal */}
@@ -902,14 +917,29 @@ export default function ScannerScreen() {
           <View style={styles.scannerContainer}>
             <CameraView
               style={styles.scanner}
-              cameraType="back"
-              barcodeScanner={{
-                barcodeTypes: ['qr', 'ean13', 'ean8', 'code128', 'code39', 'upc_a', 'upc_e'],
+              facing="back"
+              onBarcodeScanned={(result) => {
+                handleBatchBarcodeScanned(result);
+                // 重置扫码状态，允许连续扫描
+                setTimeout(() => setLastScannedBarcode(''), 500);
               }}
-              onBarcodeScanned={handleBatchBarcodeScanned}
             />
             <View style={styles.scannerOverlay}>
               <View style={styles.scannerFrame} />
+              {/* 对焦按钮 */}
+              <TouchableOpacity
+                style={styles.focusButton}
+                onPress={() => {
+                  // 切换对焦状态
+                  setIsFocused(!isFocused);
+                }}
+              >
+                <FontAwesome6
+                  name={isFocused ? 'bullseye' : 'circle'}
+                  size={24}
+                  color="#FFFFFF"
+                />
+              </TouchableOpacity>
             </View>
             <Text style={styles.scannerHint}>将快递单号条形码放入框内</Text>
           </View>
@@ -1676,5 +1706,43 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     backgroundColor: 'rgba(0,0,0,0.6)',
     padding: 12,
+  },
+  scannerFocusBtn: {
+    position: 'absolute',
+    bottom: 120,
+    right: 20,
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: 'rgba(255,255,255,0.9)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 4,
+    elevation: 5,
+  },
+  scannerCloseBtn: {
+    position: 'absolute',
+    top: 20,
+    right: 20,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  focusButton: {
+    position: 'absolute',
+    bottom: 100,
+    alignSelf: 'center',
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    backgroundColor: 'rgba(255,255,255,0.3)',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
 });
