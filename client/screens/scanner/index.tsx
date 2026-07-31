@@ -404,6 +404,11 @@ export default function ScannerScreen() {
     setShowTrackingScanModal(false);
   }, []);
 
+  // 打开扫码 Modal
+  const handleBatchScan = useCallback(() => {
+    setShowTrackingScanModal(true);
+  }, []);
+
   const scanLineTranslateY = scanLineAnim.interpolate({
     inputRange: [0, 1],
     outputRange: [0, 220],
