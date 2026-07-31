@@ -400,7 +400,7 @@ export default function ScannerScreen() {
 
   // 扫码 Modal 扫码成功回调
   const handleBatchBarcodeScanned = useCallback((barcode: string) => {
-    setBatchTrackingNumber(barcode);
+    setTrackingNumber(barcode);
     setShowTrackingScanModal(false);
   }, []);
 
@@ -451,7 +451,7 @@ export default function ScannerScreen() {
             <View style={styles.cameraContainer}>
               <CameraView
                 style={styles.camera}
-                facing="back"
+                cameraType="back"
                 barcodeScannerSettings={{
                   barcodeTypes: ['code128', 'code39', 'code93', 'ean13', 'ean8', 'upc_a', 'upc_e', 'qr'],
                 }}
@@ -863,7 +863,7 @@ export default function ScannerScreen() {
                     editable={!batchSubmitting}
                   />
                   <TouchableOpacity
-                    style={styles.batchScanBtn}
+                    style={styles.batchScanButton}
                     onPress={handleBatchScan}
                     disabled={batchSubmitting}
                   >
@@ -887,14 +887,14 @@ export default function ScannerScreen() {
 
       {/* 扫码填写快递单号 Modal */}
       <Modal
-        visible={showBatchScanner}
+        visible={showTrackingScanModal}
         animationType="slide"
-        onRequestClose={() => setShowBatchScanner(false)}
+        onRequestClose={() => setShowTrackingScanModal(false)}
       >
         <View style={styles.scannerModalContainer}>
           <View style={styles.scannerModalHeader}>
             <Text style={styles.scannerModalTitle}>扫描快递单号</Text>
-            <TouchableOpacity onPress={() => setShowBatchScanner(false)}>
+            <TouchableOpacity onPress={() => setShowTrackingScanModal(false)}>
               <FontAwesome6 name="xmark" size={20} color="#6B7280" />
             </TouchableOpacity>
           </View>
@@ -902,7 +902,7 @@ export default function ScannerScreen() {
           <View style={styles.scannerContainer}>
             <CameraView
               style={styles.scanner}
-              facing="back"
+              cameraType="back"
               barcodeScannerSettings={{
                 barcodeTypes: ['qr', 'ean13', 'ean8', 'code128', 'code39', 'upc_a', 'upc_e'],
               }}
