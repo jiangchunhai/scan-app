@@ -525,16 +525,28 @@ router.get('/pending-records', async (req, res) => {
       body: JSON.stringify({ filter }),
     });
 
-    const recordsData = await recordsRes.json() as { success: boolean; msg?: string; data?: { items?: Array<{ record_id: string; fields: Record<string, unknown> }> } };
+    const recordsData = await recordsRes.json() as { success: boolean; msg?: string; data?: { items?: Array<{ record_id: string; fields: Record<string, unknown> }>; records?: Array<{ record_id: string; fields: Record<string, unknown> }> } };
     if (!recordsData.success) {
       throw new Error(`查询记录失败：${recordsData.msg}`);
     }
 
-    const items = recordsData.data?.items || [];
-    const records = items.map(item => ({
-      record_id: item.record_id,
-      order_number: item.fields['1688 订单编号'] as string || '',
-    }));
+    // 飞书 API 返回格式：data.records 或 data.items
+    const items = recordsData.data?.records || recordsData.data?.items || [];
+    const records = items.map(item => {
+      // 1688 订单编号字段可能是数组格式：[{text: "xxx", type: "text"}]
+      const orderField = item.fields['1688 订单编号'] || item.fields['1688订单编号'];
+      let orderNumber = '';
+      if (Array.isArray(orderField)) {
+        orderNumber = orderField.map((f: any) => f.text || '').join('');
+      } else if (typeof orderField === 'string') {
+        orderNumber = orderField;
+      }
+
+      return {
+        record_id: item.record_id,
+        order_number: orderNumber,
+      };
+    });
 
     res.json({ success: true, data: { records, count: records.length } });
   } catch (err) {
