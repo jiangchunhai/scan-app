@@ -183,8 +183,6 @@ export default function ScannerScreen() {
     if (now - lastScanTime.current < 3000) return;
     if (isProcessing) return;
 
-    lastScanTime.current = now;
-
     // Haptic feedback on scan
     if (Platform.OS !== 'web') {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
@@ -198,8 +196,12 @@ export default function ScannerScreen() {
         status: 'duplicate',
         error: '该订单编号已登记，无需重复提交',
       });
+      // 重复扫描不更新时间戳，允许立即扫描新条码
       return;
     }
+
+    // 只有成功扫描才更新时间戳
+    lastScanTime.current = now;
 
     // Show confirmation modal instead of auto-syncing
     setPendingBarcode(data);
@@ -405,14 +407,20 @@ export default function ScannerScreen() {
 
   // 扫码 Modal 扫码成功回调
   const handleBatchBarcodeScanned = useCallback(({ data }: { data: string }) => {
-    // 防止重复扫描同一个条码
+    // 防止短时间内重复扫描同一个条码
     if (data === lastScannedBarcode) {
       return;
     }
     setLastScannedBarcode(data);
     setTrackingNumber(data);
-    setShowTrackingScanModal(false);
+    // 不立即关闭 Modal，让用户确认或修改
   }, [lastScannedBarcode]);
+
+  // 关闭扫码 Modal 时重置状态
+  const handleCloseTrackingScanModal = useCallback(() => {
+    setShowTrackingScanModal(false);
+    setLastScannedBarcode(''); // 重置，允许下次扫描相同条码
+  }, []);
 
   // 打开扫码 Modal
   const handleBatchScan = useCallback(() => {
@@ -904,12 +912,12 @@ export default function ScannerScreen() {
       <Modal
         visible={showTrackingScanModal}
         animationType="slide"
-        onRequestClose={() => setShowTrackingScanModal(false)}
+        onRequestClose={handleCloseTrackingScanModal}
       >
         <View style={styles.scannerModalContainer}>
           <View style={styles.scannerModalHeader}>
             <Text style={styles.scannerModalTitle}>扫描快递单号</Text>
-            <TouchableOpacity onPress={() => setShowTrackingScanModal(false)}>
+            <TouchableOpacity onPress={handleCloseTrackingScanModal}>
               <FontAwesome6 name="xmark" size={20} color="#6B7280" />
             </TouchableOpacity>
           </View>
