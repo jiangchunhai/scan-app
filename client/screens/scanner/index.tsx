@@ -934,20 +934,6 @@ export default function ScannerScreen() {
             />
             <View style={styles.scannerOverlay}>
               <View style={styles.scannerFrame} />
-              {/* 对焦按钮 */}
-              <TouchableOpacity
-                style={styles.focusButton}
-                onPress={() => {
-                  // 切换对焦状态
-                  setIsFocused(!isFocused);
-                }}
-              >
-                <FontAwesome6
-                  name={isFocused ? 'bullseye' : 'circle'}
-                  size={24}
-                  color="#FFFFFF"
-                />
-              </TouchableOpacity>
             </View>
             <Text style={styles.scannerHint}>将快递单号条形码放入框内</Text>
           </View>
