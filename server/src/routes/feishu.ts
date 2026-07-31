@@ -510,8 +510,8 @@ router.get('/pending-records', async (req, res) => {
     const filter = JSON.stringify({
       conjunction: 'and',
       conditions: [
-        { field_name: '快递单号', operator: 'isEmpty' },
-        { field_name: '1688 订单编号', operator: 'isNotEmpty' },
+        { field_name: '快递单号', operator: 'isEmpty', value: [] },
+        { field_name: '1688 订单编号', operator: 'isNotEmpty', value: [] },
       ],
     });
     const recordsUrl = `https://open.feishu.cn/open-apis/bitable/v1/apps/${config.app_token}/tables/${config.table_id}/records/search?page_size=500`;
