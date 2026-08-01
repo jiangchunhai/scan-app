@@ -309,7 +309,7 @@ export default function ScannerScreen() {
     setTimeout(() => {
       setCameraKey(prev => prev + 1);
       setScanning(true);
-    }, 100);
+    }, 500);
   }, []);
 
   const handleClearToday = useCallback(async () => {
