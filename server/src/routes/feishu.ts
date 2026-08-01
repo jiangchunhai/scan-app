@@ -609,6 +609,7 @@ router.post('/batch-tracking', async (req, res) => {
     }
 
     console.log("[batch-tracking] recordsData:", JSON.stringify(recordsData));
+    console.log("[batch-tracking] recordsData:", JSON.stringify(recordsData));
     const items = recordsData.data?.items || recordsData.data?.records || [];
     if (items.length === 0) {
       return res.json({ success: true, updated: 0, message: '没有需要更新的记录' });
