@@ -299,11 +299,10 @@ export default function ScannerScreen() {
     } catch (err) {
       const errorMsg = err instanceof Error ? err.message : '网络请求失败';
       setLastScan({ barcode: data, status: 'failed', error: errorMsg });
-    } finally {
-      setIsProcessing(false);
-      // Resume scanning immediately
       setScanning(true);
     }
+  }, []);
+
   const handleRefreshCamera = useCallback(() => {
     setScanning(false);
     setCameraKey(prev => prev + 1);
@@ -311,8 +310,6 @@ export default function ScannerScreen() {
       setScanning(true);
     }, 1500);
   }, []);
-  }, []);
-
   const handleClearToday = useCallback(async () => {
     setClearing(true);
     try {
