@@ -541,7 +541,7 @@ router.get('/pending-records', async (req, res) => {
     }
 
     // 飞书 API 返回格式：data.records 或 data.items
-    const items = recordsData.data?.records || recordsData.data?.items || [];
+    const items = recordsData.data?.items || recordsData.data?.records || [];
     const records = items.map(item => {
       // 1688 订单编号字段可能是数组格式：[{text: "xxx", type: "text"}]
       const orderField = item.fields['1688 订单编号'] || item.fields['1688订单编号'];
@@ -608,7 +608,8 @@ router.post('/batch-tracking', async (req, res) => {
       throw new Error(`查询记录失败: ${recordsData.msg}`);
     }
 
-    const items = recordsData.data?.records || recordsData.data?.items || [];
+    console.log("[batch-tracking] recordsData:", JSON.stringify(recordsData));
+    const items = recordsData.data?.items || recordsData.data?.records || [];
     if (items.length === 0) {
       return res.json({ success: true, updated: 0, message: '没有需要更新的记录' });
     }
