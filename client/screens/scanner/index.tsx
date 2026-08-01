@@ -59,6 +59,7 @@ export default function ScannerScreen() {
   const [batchSubmitting, setBatchSubmitting] = useState(false);
   const [batchResult, setBatchResult] = useState<{ updated: number } | null>(null);
   const [showTrackingScanModal, setShowTrackingScanModal] = useState(false);
+  const [scanSuccessMsg, setScanSuccessMsg] = useState<string | null>(null);
   const [lastScannedBarcode, setLastScannedBarcode] = useState('');
   const [isFocused, setIsFocused] = useState(false);
   const [trackingScanResult, setTrackingScanResult] = useState<string | null>(null);
@@ -303,14 +304,13 @@ export default function ScannerScreen() {
       // Resume scanning immediately
       setScanning(true);
     }
-  }, [isProcessing, tableRecords, playSuccessSound, playDuplicateSound, fetchStats, loadTableRecordsForDedup]);
-
   const handleRefreshCamera = useCallback(() => {
     setScanning(false);
     setCameraKey(prev => prev + 1);
     setTimeout(() => {
       setScanning(true);
-    }, 1000);
+    }, 1500);
+  }, []);
   }, []);
 
   const handleClearToday = useCallback(async () => {
@@ -446,7 +446,8 @@ export default function ScannerScreen() {
     }
     setLastScannedBarcode(data);
     setTrackingNumber(data);
-    Alert.alert("扫码成功", `已识别：${data}`);
+    setScanSuccessMsg(`已识别：${data}`);
+    setTimeout(() => setScanSuccessMsg(null), 2000);
     // 不立即关闭 Modal，让用户确认或修改
   }, [lastScannedBarcode]);
 
@@ -926,6 +927,12 @@ export default function ScannerScreen() {
             </TouchableOpacity>
           </View>
 
+          {scanSuccessMsg && (
+            <View style={styles.scanSuccessBanner}>
+              <FontAwesome6 name="check-circle" size={16} color="#059669" />
+              <Text style={styles.scanSuccessText}>{scanSuccessMsg}</Text>
+            </View>
+          )}
           <View style={styles.scannerContainer}>
             <CameraView
               style={styles.scanner}
