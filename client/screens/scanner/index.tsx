@@ -39,6 +39,7 @@ export default function ScannerScreen() {
   const [permission, requestPermission] = useCameraPermissions();
   const hasPermission = permission?.granted ?? false;
   const [scanning, setScanning] = useState(true);
+  const [cameraKey, setCameraKey] = useState(0);
   const [lastScan, setLastScan] = useState<{ barcode: string; status: 'success' | 'failed' | 'duplicate'; error?: string } | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
   const [stats, setStats] = useState<Stats>({ total: 0, today: 0, success: 0, today_success: 0, failed: 0, today_failed: 0 });
@@ -303,6 +304,10 @@ export default function ScannerScreen() {
     }
   }, [isProcessing, tableRecords, playSuccessSound, playDuplicateSound, fetchStats, loadTableRecordsForDedup]);
 
+  const handleRefreshCamera = useCallback(() => {
+    setCameraKey(prev => prev + 1);
+  }, []);
+
   const handleClearToday = useCallback(async () => {
     setClearing(true);
     try {
@@ -491,7 +496,15 @@ export default function ScannerScreen() {
           <View style={styles.cameraSection}>
           {hasPermission ? (
             <View style={styles.cameraContainer}>
+              {/* Refresh button */}
+              <TouchableOpacity
+                style={styles.refreshButton}
+                onPress={handleRefreshCamera}
+              >
+                <FontAwesome6 name="rotate" size={20} color="#FFFFFF" />
+              </TouchableOpacity>
               <CameraView
+                key={cameraKey}
                 style={styles.camera}
                 facing="back"
                 barcodeScannerSettings={{
@@ -982,6 +995,18 @@ const styles = StyleSheet.create({
     borderRadius: 24,
     overflow: 'hidden',
     backgroundColor: '#000',
+  },
+  refreshButton: {
+    position: 'absolute',
+    top: 12,
+    right: 12,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 10,
   },
   camera: {
     width: '100%',
