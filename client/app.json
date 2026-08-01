@@ -1,7 +1,7 @@
 {
   "expo": {
     "name": "扫码识别",
-    "slug": "saoma",
+    "slug": "scan-app",
     "version": "1.0.9",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
@@ -67,6 +67,6 @@
         "projectId": "df362bb1-55f3-48ba-8106-bd0612e594bb"
       }
     },
-    "owner": "jiangchunhai123"
+    "owner": "jiangchunhai123s-team"
   }
 }
