@@ -17,7 +17,7 @@ import {
   Keyboard,
 } from 'react-native';
 import { CameraView, useCameraPermissions, type BarcodeScanningResult } from 'expo-camera';
-import * as Haptics from 'expo-haptics';
+import { Audio } from 'expo-av';
 import { FontAwesome6 } from '@expo/vector-icons';
 import { Screen } from '@/components/Screen';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -41,7 +41,6 @@ export default function ScannerScreen() {
   const [scanning, setScanning] = useState(true);
   const [lastScan, setLastScan] = useState<{ barcode: string; status: 'success' | 'failed' | 'duplicate'; error?: string } | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
-  const [pendingBarcode, setPendingBarcode] = useState<string | null>(null);
   const [stats, setStats] = useState<Stats>({ total: 0, today: 0, success: 0, today_success: 0, failed: 0, today_failed: 0 });
   const [configReady, setConfigReady] = useState(false);
   const [configChecking, setConfigChecking] = useState(true);
@@ -62,10 +61,57 @@ export default function ScannerScreen() {
   const [lastScannedBarcode, setLastScannedBarcode] = useState('');
   const [isFocused, setIsFocused] = useState(false);
   const [trackingScanResult, setTrackingScanResult] = useState<string | null>(null);
-  const [showScanConfirmModal, setShowScanConfirmModal] = useState(false);
-  const [pendingScanBarcode, setPendingScanBarcode] = useState('');
   const scanLineAnim = useRef(new Animated.Value(0)).current;
   const lastScanTime = useRef(0);
+  const successSound = useRef<Audio.Sound | null>(null);
+  const duplicateSound = useRef<Audio.Sound | null>(null);
+
+  // Load sound effects
+  useEffect(() => {
+    async function loadSounds() {
+      try {
+        const { sound: success } = await Audio.Sound.createAsync(
+          require('@/assets/success.wav'),
+          { shouldPlay: false }
+        );
+        successSound.current = success;
+
+        const { sound: duplicate } = await Audio.Sound.createAsync(
+          require('@/assets/duplicate.wav'),
+          { shouldPlay: false }
+        );
+        duplicateSound.current = duplicate;
+      } catch (error) {
+        console.log('音效加载失败:', error);
+      }
+    }
+    loadSounds();
+
+    return () => {
+      successSound.current?.unloadAsync();
+      duplicateSound.current?.unloadAsync();
+    };
+  }, []);
+
+  const playSuccessSound = useCallback(async () => {
+    try {
+      if (successSound.current) {
+        await successSound.current.replayAsync();
+      }
+    } catch (error) {
+      console.log('播放成功音效失败:', error);
+    }
+  }, []);
+
+  const playDuplicateSound = useCallback(async () => {
+    try {
+      if (duplicateSound.current) {
+        await duplicateSound.current.replayAsync();
+      }
+    } catch (error) {
+      console.log('播放重复音效失败:', error);
+    }
+  }, []);
 
   // Animate scan line
   useEffect(() => {
@@ -182,14 +228,9 @@ export default function ScannerScreen() {
   // Handle barcode scan
   const handleBarcodeScanned = useCallback(async ({ data }: BarcodeScanningResult) => {
     const now = Date.now();
-    // Debounce: prevent scanning same barcode within 3 seconds
-    if (now - lastScanTime.current < 3000) return;
+    // Debounce: prevent scanning same barcode within 2 seconds
+    if (now - lastScanTime.current < 2000) return;
     if (isProcessing) return;
-
-    // Haptic feedback on scan
-    if (Platform.OS !== 'web') {
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-    }
 
     // Check if barcode already exists in Feishu table (frontend duplicate detection)
     const isDuplicate = tableRecords.some(r => r.value === data);
@@ -199,6 +240,8 @@ export default function ScannerScreen() {
         status: 'duplicate',
         error: '该订单编号已登记，无需重复提交',
       });
+      // 播放重复音效
+      playDuplicateSound();
       // 重复扫描不更新时间戳，允许立即扫描新条码
       return;
     }
@@ -206,22 +249,12 @@ export default function ScannerScreen() {
     // 只有成功扫描才更新时间戳
     lastScanTime.current = now;
 
-    // Show confirmation modal instead of auto-syncing
-    setPendingBarcode(data);
-    setScanning(false);
-  }, [isProcessing, tableRecords]);
-
-  const handleConfirmSync = useCallback(async () => {
-    if (!pendingBarcode) return;
-    const data = pendingBarcode;
-    setPendingBarcode(null);
-    setIsProcessing(true);
+    // Play success sound
+    playSuccessSound();
 
     // Optimistic update: show success immediately
     setLastScan({ barcode: data, status: 'success' });
-    if (Platform.OS !== 'web') {
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-    }
+    setIsProcessing(true);
 
     // Sync to Feishu in background (fire-and-forget)
     try {
@@ -246,9 +279,6 @@ export default function ScannerScreen() {
       if (!result.success) {
         // Update status if sync failed
         setLastScan({ barcode: data, status: 'failed', error: result.error });
-        if (Platform.OS !== 'web') {
-          Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
-        }
       } else if (result.data?.status === 'duplicate') {
         // Update status if duplicate
         setLastScan({
@@ -256,9 +286,7 @@ export default function ScannerScreen() {
           status: 'duplicate',
           error: result.message,
         });
-        if (Platform.OS !== 'web') {
-          Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
-        }
+        playDuplicateSound();
       }
 
       // Refresh stats and table records in background
@@ -267,20 +295,12 @@ export default function ScannerScreen() {
     } catch (err) {
       const errorMsg = err instanceof Error ? err.message : '网络请求失败';
       setLastScan({ barcode: data, status: 'failed', error: errorMsg });
-      if (Platform.OS !== 'web') {
-        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
-      }
     } finally {
       setIsProcessing(false);
       // Resume scanning immediately
       setScanning(true);
     }
-  }, [pendingBarcode, fetchStats, loadTableRecordsForDedup]);
-
-  const handleCancelScan = useCallback(() => {
-    setPendingBarcode(null);
-    setScanning(true);
-  }, []);
+  }, [isProcessing, tableRecords, playSuccessSound, playDuplicateSound, fetchStats, loadTableRecordsForDedup]);
 
   const handleClearToday = useCallback(async () => {
     setClearing(true);
@@ -534,47 +554,6 @@ export default function ScannerScreen() {
             </View>
           )}
         </View>
-
-        {/* Confirmation Modal */}
-        <Modal
-          visible={pendingBarcode !== null}
-          transparent
-          animationType="fade"
-          onRequestClose={handleCancelScan}
-        >
-          <View style={styles.confirmOverlay}>
-            <View style={styles.confirmCard}>
-              <View style={styles.confirmIconWrap}>
-                <FontAwesome6 name="barcode" size={36} color="#4F46E5" />
-              </View>
-              <Text style={styles.confirmTitle}>确认登记到飞书</Text>
-              <View style={styles.confirmBarcodeBox}>
-                <Text style={styles.confirmBarcodeLabel}>订单编号</Text>
-                <Text style={styles.confirmBarcodeValue} selectable>{pendingBarcode}</Text>
-              </View>
-              <View style={styles.confirmButtons}>
-                <TouchableOpacity
-                  style={[styles.confirmBtn, styles.confirmBtnCancel]}
-                  onPress={handleCancelScan}
-                  disabled={isProcessing}
-                >
-                  <Text style={styles.confirmBtnCancelText}>取消</Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={[styles.confirmBtn, styles.confirmBtnOk]}
-                  onPress={handleConfirmSync}
-                  disabled={isProcessing}
-                >
-                  {isProcessing ? (
-                    <ActivityIndicator color="#fff" size="small" />
-                  ) : (
-                    <Text style={styles.confirmBtnOkText}>确认</Text>
-                  )}
-                </TouchableOpacity>
-              </View>
-            </View>
-          </View>
-        </Modal>
 
         {/* Last Scan Result Card */}
         {lastScan && (
