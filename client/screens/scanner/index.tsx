@@ -61,6 +61,8 @@ export default function ScannerScreen() {
   const [lastScannedBarcode, setLastScannedBarcode] = useState('');
   const [isFocused, setIsFocused] = useState(false);
   const [trackingScanResult, setTrackingScanResult] = useState<string | null>(null);
+  const [showScanConfirmModal, setShowScanConfirmModal] = useState(false);
+  const [pendingScanBarcode, setPendingScanBarcode] = useState('');
   const scanLineAnim = useRef(new Animated.Value(0)).current;
   const lastScanTime = useRef(0);
 
@@ -470,6 +472,9 @@ export default function ScannerScreen() {
               <CameraView
                 style={styles.camera}
                 facing="back"
+                barcodeScannerSettings={{
+                  barcodeTypes: ['qr', 'ean13', 'ean8', 'code128', 'code39', 'upce', 'upca'],
+                }}
                 onBarcodeScanned={scanning ? handleBarcodeScanned : undefined}
               />
               {/* Scan overlay */}
@@ -827,8 +832,8 @@ export default function ScannerScreen() {
       >
         <KeyboardAvoidingView
           style={{ flex: 1 }}
-          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-          keyboardVerticalOffset={100}
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          keyboardVerticalOffset={Platform.OS === 'ios' ? 100 : 0}
         >
           <TouchableWithoutFeedback onPress={Keyboard.dismiss} disabled={Platform.OS === 'web'}>
             <View style={styles.modalOverlay}>
