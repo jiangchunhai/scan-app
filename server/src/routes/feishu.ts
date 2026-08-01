@@ -536,7 +536,7 @@ router.get('/pending-records', async (req, res) => {
     });
 
     const recordsData = await recordsRes.json() as { success: boolean; msg?: string; data?: { items?: Array<{ record_id: string; fields: Record<string, unknown> }>; records?: Array<{ record_id: string; fields: Record<string, unknown> }> } };
-    if (!recordsData.success) {
+    if (recordsData.code !== 0 && recordsData.code !== undefined) {
       throw new Error(`查询记录失败：${recordsData.msg}`);
     }
 
@@ -603,8 +603,8 @@ router.post('/batch-tracking', async (req, res) => {
       body: JSON.stringify({ filter }),
     });
 
-    const recordsData = await recordsRes.json() as { success: boolean; msg?: string; data?: { items?: Array<{ record_id: string; fields: Record<string, unknown> }> } };
-    if (!recordsData.success) {
+    const recordsData = await recordsRes.json() as { code?: number; msg?: string; data?: { items?: Array<{ record_id: string; fields: Record<string, unknown> }> } };
+    if (recordsData.code !== 0 && recordsData.code !== undefined) {
       throw new Error(`查询记录失败: ${recordsData.msg}`);
     }
 
