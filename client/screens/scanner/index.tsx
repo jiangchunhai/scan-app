@@ -423,7 +423,7 @@ export default function ScannerScreen() {
       });
       const result = await response.json();
       if (result.success) {
-        Alert.alert('填写成功', `成功填写 ${result.data.updated_count} 条记录`);
+        Alert.alert('填写成功', `成功填写 ${result.updated} 条记录`);
         setShowTrackingScanModal(false);
         loadPendingRecords();
         fetchStats();
