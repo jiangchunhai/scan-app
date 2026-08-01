@@ -305,7 +305,11 @@ export default function ScannerScreen() {
   }, [isProcessing, tableRecords, playSuccessSound, playDuplicateSound, fetchStats, loadTableRecordsForDedup]);
 
   const handleRefreshCamera = useCallback(() => {
-    setCameraKey(prev => prev + 1);
+    setScanning(false);
+    setTimeout(() => {
+      setCameraKey(prev => prev + 1);
+      setScanning(true);
+    }, 100);
   }, []);
 
   const handleClearToday = useCallback(async () => {
@@ -419,11 +423,10 @@ export default function ScannerScreen() {
       });
       const result = await response.json();
       if (result.success) {
-        setTrackingScanResult(`成功填写 ${result.data.updated_count} 条记录`);
+        Alert.alert('填写成功', `成功填写 ${result.data.updated_count} 条记录`);
         setShowTrackingScanModal(false);
         loadPendingRecords();
         fetchStats();
-        setTimeout(() => setTrackingScanResult(null), 3000);
       } else {
         Alert.alert('错误', result.error || '填写失败');
       }
