@@ -964,6 +964,7 @@ const styles = StyleSheet.create({
   },
   scrollContentContainer: {
     paddingBottom: 40,
+  },
   scanSuccessBanner: {
     flexDirection: 'row',
     alignItems: 'center',
