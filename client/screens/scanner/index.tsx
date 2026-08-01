@@ -29,6 +29,7 @@ interface Stats {
   success: number;
   today_success: number;
   failed: number;
+  today_failed: number;
 }
 
 const FEISHU_BITABLE_URL = 'https://gcnop2681oz6.feishu.cn/base/FeYNbNOGcaZltysJowEcuzginfd?table=tblCmub3OU18zCle&view=vewzaoO9z0';
@@ -41,7 +42,7 @@ export default function ScannerScreen() {
   const [lastScan, setLastScan] = useState<{ barcode: string; status: 'success' | 'failed' | 'duplicate'; error?: string } | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
   const [pendingBarcode, setPendingBarcode] = useState<string | null>(null);
-  const [stats, setStats] = useState<Stats>({ total: 0, today: 0, success: 0, today_success: 0, failed: 0 });
+  const [stats, setStats] = useState<Stats>({ total: 0, today: 0, success: 0, today_success: 0, failed: 0, today_failed: 0 });
   const [configReady, setConfigReady] = useState(false);
   const [configChecking, setConfigChecking] = useState(true);
   const [tableRecords, setTableRecords] = useState<Array<{ index: number; value: string }>>([]);
@@ -649,17 +650,17 @@ export default function ScannerScreen() {
             <View style={styles.statDivider} />
             <View style={styles.statItem}>
               <Text style={[styles.statNumber, styles.statSuccess]}>{stats.today_success}</Text>
-              <Text style={styles.statLabel}>登记成功</Text>
+              <Text style={styles.statLabel}>今日成功</Text>
+            </View>
+            <View style={styles.statDivider} />
+            <View style={styles.statItem}>
+              <Text style={[styles.statNumber, styles.statFailed]}>{stats.today_failed}</Text>
+              <Text style={styles.statLabel}>今日失败</Text>
             </View>
             <View style={styles.statDivider} />
             <View style={styles.statItem}>
               <Text style={styles.statNumber}>{stats.total}</Text>
               <Text style={styles.statLabel}>累计扫描</Text>
-            </View>
-            <View style={styles.statDivider} />
-            <View style={styles.statItem}>
-              <Text style={[styles.statNumber, styles.statFailed]}>{stats.failed}</Text>
-              <Text style={styles.statLabel}>登记失败</Text>
             </View>
           </View>
 

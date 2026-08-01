@@ -330,7 +330,16 @@ router.get('/stats', async (_req: Request, res: Response) => {
       .select('*', { count: 'exact', head: true })
       .eq('status', 'failed');
 
-    if (failedError) throw new Error(`统计失败: ${failedError.message}`);
+    if (failedError) throw new Error(`统计失败：${failedError.message}`);
+
+    // Today's failed count
+    const { count: todayFailedCount, error: todayFailedError } = await client
+      .from('scan_records')
+      .select('*', { count: 'exact', head: true })
+      .eq('status', 'failed')
+      .gte('created_at', todayStr);
+
+    if (todayFailedError) throw new Error(`统计失败：${todayFailedError.message}`);
 
     res.json({
       success: true,
@@ -340,7 +349,9 @@ router.get('/stats', async (_req: Request, res: Response) => {
         success: successCount || 0,
         today_success: todaySuccessCount || 0,
         failed: failedCount || 0,
+        today_failed: todayFailedCount || 0,
       },
+    });
     });
   } catch (err) {
     const message = err instanceof Error ? err.message : '获取统计失败';
