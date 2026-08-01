@@ -631,9 +631,9 @@ router.post('/batch-tracking', async (req, res) => {
       body: JSON.stringify({ records: updateRecords }),
     });
 
-    const updateData = await updateRes.json() as { success: boolean; msg?: string };
-    if (!updateData.success) {
-      throw new Error(`更新失败: ${updateData.msg}`);
+    const updateData = await updateRes.json() as { code?: number; msg?: string; data?: { records?: Array<{ record_id: string }> } };
+    if (updateData.code !== 0 && updateData.code !== undefined) {
+      throw new Error(`更新失败：${updateData.msg}`);
     }
 
     res.json({
