@@ -70,6 +70,7 @@ export default function ScannerScreen() {
   // Load sound effects
   useEffect(() => {
     async function loadSounds() {
+      await Audio.setAudioModeAsync({ playsInSilentModeIOS: true, staysActiveInBackground: false });
       try {
         const { sound: success } = await Audio.Sound.createAsync(
           require('@/assets/success.wav'),
@@ -306,10 +307,10 @@ export default function ScannerScreen() {
 
   const handleRefreshCamera = useCallback(() => {
     setScanning(false);
+    setCameraKey(prev => prev + 1);
     setTimeout(() => {
-      setCameraKey(prev => prev + 1);
       setScanning(true);
-    }, 500);
+    }, 1000);
   }, []);
 
   const handleClearToday = useCallback(async () => {
@@ -445,6 +446,7 @@ export default function ScannerScreen() {
     }
     setLastScannedBarcode(data);
     setTrackingNumber(data);
+    Alert.alert("扫码成功", `已识别：${data}`);
     // 不立即关闭 Modal，让用户确认或修改
   }, [lastScannedBarcode]);
 

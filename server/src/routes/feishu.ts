@@ -608,7 +608,7 @@ router.post('/batch-tracking', async (req, res) => {
       throw new Error(`查询记录失败: ${recordsData.msg}`);
     }
 
-    const items = recordsData.data?.items || [];
+    const items = recordsData.data?.records || recordsData.data?.items || [];
     if (items.length === 0) {
       return res.json({ success: true, updated: 0, message: '没有需要更新的记录' });
     }
