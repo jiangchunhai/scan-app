@@ -964,6 +964,22 @@ const styles = StyleSheet.create({
   },
   scrollContentContainer: {
     paddingBottom: 40,
+  scanSuccessBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 12,
+    backgroundColor: '#ECFDF5',
+    borderRadius: 8,
+    marginHorizontal: 16,
+    marginTop: 8,
+    gap: 8,
+  },
+  scanSuccessText: {
+    fontSize: 14,
+    color: '#059669',
+    fontWeight: '600',
+  },
   },
   header: {
     backgroundColor: '#F5F5F4',
