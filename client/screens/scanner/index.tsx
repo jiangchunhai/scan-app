@@ -980,7 +980,6 @@ const styles = StyleSheet.create({
     color: '#059669',
     fontWeight: '600',
   },
-  },
   header: {
     backgroundColor: '#F5F5F4',
     paddingHorizontal: 20,
