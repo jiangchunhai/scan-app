@@ -352,7 +352,6 @@ router.get('/stats', async (_req: Request, res: Response) => {
         today_failed: todayFailedCount || 0,
       },
     });
-    });
   } catch (err) {
     const message = err instanceof Error ? err.message : '获取统计失败';
     res.status(500).json({ success: false, error: message });
