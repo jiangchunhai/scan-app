@@ -175,7 +175,7 @@ export default function ScannerScreen() {
         data: Array<{ fields: Record<string, unknown> }>;
       };
       if (result.success) {
-        const mapped = result.data.map((item, idx) => ({
+        const mapped = result.data.records.map((item, idx) => ({
           index: idx + 1,
           value: String(item.fields?.['1688订单编号'] || ''),
         }));
@@ -193,9 +193,9 @@ export default function ScannerScreen() {
   const loadTableRecordsForDedup = useCallback(async () => {
     try {
       const response = await fetch(`${process.env.EXPO_PUBLIC_BACKEND_BASE_URL}/api/v1/feishu/table-records?user_id=mobile-app`);
-      const result = await response.json() as { success: boolean; data: Array<{ fields: Record<string, unknown> }> | null };
-      if (result.success && result.data) {
-        const mapped = result.data.map((item, idx) => ({
+      const result = await response.json() as { success: boolean; data: { records?: Array<{ fields: Record<string, unknown> }> } | null };
+      if (result.success && result.data?.records) {
+        const mapped = result.data.records.map((item, idx) => ({
           index: idx + 1,
           value: String(item.fields?.['1688订单编号'] || ''),
         }));
