@@ -154,6 +154,7 @@ export default function ScannerScreen() {
           success: d.success_scans ?? d.success ?? 0,
           today_success: d.today_success ?? d.success_scans ?? d.success ?? 0,
           failed: d.failed_scans ?? d.failed ?? 0,
+          today_failed: d.today_failed ?? d.failed_scans ?? d.failed ?? 0,
         });
       }
     } catch {
@@ -494,7 +495,7 @@ export default function ScannerScreen() {
                 style={styles.camera}
                 facing="back"
                 barcodeScannerSettings={{
-                  barcodeTypes: ['qr', 'ean13', 'ean8', 'code128', 'code39', 'upce', 'upca'],
+                  barcodeTypes: ['qr', 'ean13', 'ean8', 'code128', 'code39', 'upc_e', 'upc_a'],
                 }}
                 onBarcodeScanned={scanning ? handleBarcodeScanned : undefined}
               />
