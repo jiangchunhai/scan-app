@@ -1,0 +1,848 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>扫码登记</title>
+  <link rel="icon" type="image/png" href="./assets/images/favicon.png">
+  <link rel="apple-touch-icon" href="./assets/images/icon.png">
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+    
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+      background: #f5f5f5;
+      min-height: 100vh;
+      padding: 16px;
+    }
+    
+    .container {
+      max-width: 600px;
+      margin: 0 auto;
+    }
+    
+    .header {
+      text-align: center;
+      margin-bottom: 20px;
+    }
+    
+    .header h1 {
+      font-size: 28px;
+      color: #1a1a1a;
+      margin-bottom: 8px;
+    }
+    
+    .header p {
+      font-size: 14px;
+      color: #666;
+    }
+    
+    .camera-container {
+      position: relative;
+      background: #000;
+      border-radius: 24px;
+      overflow: hidden;
+      margin-bottom: 20px;
+      aspect-ratio: 4/3;
+    }
+    
+    #video {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
+    
+    .scan-overlay {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      width: 200px;
+      height: 200px;
+      border: 2px solid #10b981;
+      border-radius: 12px;
+      pointer-events: none;
+    }
+    
+    .scan-overlay::before,
+    .scan-overlay::after {
+      content: '';
+      position: absolute;
+      width: 20px;
+      height: 20px;
+      border: 3px solid #10b981;
+    }
+    
+    .scan-overlay::before {
+      top: -3px;
+      left: -3px;
+      border-right: none;
+      border-bottom: none;
+    }
+    
+    .scan-overlay::after {
+      bottom: -3px;
+      right: -3px;
+      border-left: none;
+      border-top: none;
+    }
+    
+    .refresh-btn {
+      position: absolute;
+      top: 12px;
+      right: 12px;
+      width: 40px;
+      height: 40px;
+      border-radius: 20px;
+      background: rgba(0, 0, 0, 0.5);
+      border: none;
+      color: white;
+      font-size: 20px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    
+    .result-card {
+      background: white;
+      border-radius: 16px;
+      padding: 20px;
+      margin-bottom: 16px;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+    }
+    
+    .result-card.success {
+      border-left: 4px solid #10b981;
+    }
+    
+    .result-card.duplicate {
+      border-left: 4px solid #f59e0b;
+    }
+    
+    .result-header {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 12px;
+    }
+    
+    .result-icon {
+      width: 32px;
+      height: 32px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 18px;
+    }
+    
+    .result-icon.success {
+      background: #d1fae5;
+      color: #10b981;
+    }
+    
+    .result-icon.duplicate {
+      background: #fef3c7;
+      color: #f59e0b;
+    }
+    
+    .result-title {
+      font-size: 18px;
+      font-weight: 600;
+    }
+    
+    .result-title.success {
+      color: #10b981;
+    }
+    
+    .result-title.duplicate {
+      color: #f59e0b;
+    }
+    
+    .result-content {
+      font-size: 32px;
+      font-weight: bold;
+      color: #1a1a1a;
+      margin: 12px 0;
+      word-break: break-all;
+    }
+    
+    .result-message {
+      font-size: 14px;
+      color: #666;
+    }
+    
+    .stats-card {
+      background: white;
+      border-radius: 16px;
+      padding: 20px;
+      margin-bottom: 16px;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+    }
+    
+    .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 16px;
+      text-align: center;
+    }
+    
+    .stat-item {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+    
+    .stat-value {
+      font-size: 28px;
+      font-weight: bold;
+      color: #1a1a1a;
+    }
+    
+    .stat-value.success {
+      color: #10b981;
+    }
+    
+    .stat-value.failed {
+      color: #ef4444;
+    }
+    
+    .stat-label {
+      font-size: 12px;
+      color: #666;
+    }
+    
+    .btn {
+      width: 100%;
+      padding: 16px;
+      border-radius: 12px;
+      border: none;
+      font-size: 16px;
+      font-weight: 600;
+      cursor: pointer;
+      margin-bottom: 12px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+    }
+    
+    .btn-primary {
+      background: #10b981;
+      color: white;
+    }
+    
+    .btn-secondary {
+      background: #f3f4f6;
+      color: #374151;
+    }
+    
+    .btn-danger {
+      background: #fee2e2;
+      color: #ef4444;
+    }
+    
+    .btn-link {
+      background: #e0e7ff;
+      color: #4f46e5;
+    }
+    
+    .modal-overlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: rgba(0, 0, 0, 0.5);
+      display: flex;
+      align-items: flex-end;
+      justify-content: center;
+      z-index: 1000;
+    }
+    
+    .modal {
+      background: white;
+      border-radius: 24px 24px 0 0;
+      width: 100%;
+      max-width: 600px;
+      max-height: 80vh;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+    }
+    
+    .modal-header {
+      padding: 20px;
+      border-bottom: 1px solid #e5e7eb;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    
+    .modal-title {
+      font-size: 20px;
+      font-weight: 600;
+    }
+    
+    .modal-close {
+      width: 32px;
+      height: 32px;
+      border-radius: 50%;
+      border: none;
+      background: #f3f4f6;
+      font-size: 18px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    
+    .modal-body {
+      padding: 20px;
+      overflow-y: auto;
+      flex: 1;
+    }
+    
+    .pending-list {
+      margin-bottom: 20px;
+    }
+    
+    .pending-item {
+      padding: 12px 0;
+      border-bottom: 1px solid #f3f4f6;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    
+    .pending-item::before {
+      content: '•';
+      color: #6366f1;
+      font-size: 20px;
+    }
+    
+    .pending-value {
+      font-size: 16px;
+      color: #1a1a1a;
+      word-break: break-all;
+    }
+    
+    .modal-footer {
+      padding: 20px;
+      border-top: 1px solid #e5e7eb;
+      display: flex;
+      gap: 12px;
+    }
+    
+    .input-group {
+      flex: 1;
+      display: flex;
+      gap: 8px;
+    }
+    
+    .input {
+      flex: 1;
+      padding: 12px 16px;
+      border-radius: 12px;
+      border: 1px solid #e5e7eb;
+      font-size: 16px;
+      outline: none;
+    }
+    
+    .input:focus {
+      border-color: #10b981;
+    }
+    
+    .scan-btn {
+      width: 48px;
+      height: 48px;
+      border-radius: 12px;
+      border: 1px solid #e5e7eb;
+      background: white;
+      font-size: 20px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    
+    .submit-btn {
+      padding: 12px 24px;
+      border-radius: 12px;
+      border: none;
+      background: #10b981;
+      color: white;
+      font-size: 16px;
+      font-weight: 600;
+      cursor: pointer;
+      white-space: nowrap;
+    }
+    
+    .success-banner {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      padding: 12px;
+      background: #ecfdf5;
+      border-radius: 8px;
+      margin: 0 16px 8px;
+    }
+    
+    .success-banner-text {
+      font-size: 14px;
+      color: #059669;
+      font-weight: 600;
+    }
+    
+    .toast {
+      position: fixed;
+      top: 20px;
+      left: 50%;
+      transform: translateX(-50%);
+      padding: 12px 24px;
+      border-radius: 12px;
+      color: white;
+      font-weight: 600;
+      z-index: 2000;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    
+    .toast.success {
+      background: #10b981;
+    }
+    
+    .toast.duplicate {
+      background: #f59e0b;
+    }
+    
+    .hidden {
+      display: none !important;
+    }
+    
+    .start-scan-btn {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      padding: 16px 32px;
+      border-radius: 12px;
+      border: none;
+      background: #10b981;
+      color: white;
+      font-size: 16px;
+      font-weight: 600;
+      cursor: pointer;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <h1>扫码登记</h1>
+      <p>扫描条形码同步至飞书</p>
+    </div>
+    
+    <div class="camera-container">
+      <video id="video" autoplay playsinline></video>
+      <div class="scan-overlay"></div>
+      <button class="refresh-btn" onclick="refreshCamera()">🔄</button>
+      <button class="start-scan-btn" id="startScanBtn" onclick="startCamera()">开始扫码</button>
+    </div>
+    
+    <div id="resultCard" class="result-card hidden">
+      <div class="result-header">
+        <div class="result-icon" id="resultIcon">✓</div>
+        <div class="result-title" id="resultTitle">登记成功</div>
+      </div>
+      <div class="result-content" id="resultContent"></div>
+      <div class="result-message" id="resultMessage"></div>
+    </div>
+    
+    <div class="stats-card">
+      <div class="stats-grid">
+        <div class="stat-item">
+          <div class="stat-value" id="statToday">0</div>
+          <div class="stat-label">今日扫描</div>
+        </div>
+        <div class="stat-item">
+          <div class="stat-value success" id="statSuccess">0</div>
+          <div class="stat-label">今日成功</div>
+        </div>
+        <div class="stat-item">
+          <div class="stat-value failed" id="statFailed">0</div>
+          <div class="stat-label">今日失败</div>
+        </div>
+        <div class="stat-item">
+          <div class="stat-value" id="statTotal">0</div>
+          <div class="stat-label">累计扫描</div>
+        </div>
+      </div>
+    </div>
+    
+    <button class="btn btn-primary" onclick="openBatchModal()">
+      🚚 批量填写快递单号
+    </button>
+    
+    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+      <button class="btn btn-secondary" onclick="clearToday()">
+        🔄 清空数据
+      </button>
+      <button class="btn btn-danger" onclick="deleteLast()">
+        🗑️ 删除上一条
+      </button>
+    </div>
+    
+    <button class="btn btn-link" onclick="viewTable()">
+       查看表格数据
+    </button>
+  </div>
+  
+  <!-- 批量填写 Modal -->
+  <div id="batchModal" class="modal-overlay hidden">
+    <div class="modal">
+      <div class="modal-header">
+        <div class="modal-title">批量填写快递单号</div>
+        <button class="modal-close" onclick="closeBatchModal()">✕</button>
+      </div>
+      <div class="modal-body">
+        <div id="scanSuccessBanner" class="success-banner hidden">
+          <span>✓</span>
+          <span class="success-banner-text" id="scanSuccessText"></span>
+        </div>
+        <div class="pending-list" id="pendingList"></div>
+      </div>
+      <div class="modal-footer">
+        <div class="input-group">
+          <input type="text" class="input" id="trackingInput" placeholder="输入或扫描快递单号">
+          <button class="scan-btn" onclick="openBatchScanner()">📷</button>
+        </div>
+        <button class="submit-btn" id="submitBtn" onclick="submitBatch()">填写0条</button>
+      </div>
+    </div>
+  </div>
+  
+  <!-- Toast -->
+  <div id="toast" class="toast hidden"></div>
+  
+  <script>
+    const API_BASE = window.location.origin;
+    let stream = null;
+    let scanning = false;
+    let tableRecords = [];
+    let pendingRecords = [];
+    let scanSuccessMsg = null;
+    
+    // 音效
+    const successSound = new Audio('./assets/success.wav');
+    const duplicateSound = new Audio('./assets/duplicate.wav');
+    
+    // 初始化
+    async function init() {
+      await loadTableRecords();
+      await loadStats();
+      await loadPendingRecords();
+    }
+    
+    // 加载表格记录（用于去重）
+    async function loadTableRecords() {
+      try {
+        const response = await fetch(`${API_BASE}/api/v1/feishu/table-records`);
+        const result = await response.json();
+        if (result.success && result.data?.records) {
+          tableRecords = result.data.records.map(item => ({
+            value: String(item.fields['1688 订单编号'] || '')
+          })).filter(r => r.value);
+        }
+      } catch (error) {
+        console.error('加载表格记录失败:', error);
+      }
+    }
+    
+    // 加载统计数据
+    async function loadStats() {
+      try {
+        const response = await fetch(`${API_BASE}/api/v1/feishu/stats`);
+        const result = await response.json();
+        if (result.success && result.data) {
+          document.getElementById('statToday').textContent = result.data.today || 0;
+          document.getElementById('statSuccess').textContent = result.data.today_success || 0;
+          document.getElementById('statFailed').textContent = result.data.today_failed || 0;
+          document.getElementById('statTotal').textContent = result.data.total || 0;
+        }
+      } catch (error) {
+        console.error('加载统计失败:', error);
+      }
+    }
+    
+    // 加载待填写记录
+    async function loadPendingRecords() {
+      try {
+        const response = await fetch(`${API_BASE}/api/v1/feishu/pending-records`);
+        const result = await response.json();
+        if (result.success && result.data) {
+          pendingRecords = result.data;
+          updatePendingList();
+        }
+      } catch (error) {
+        console.error('加载待填写记录失败:', error);
+      }
+    }
+    
+    // 更新待填写列表
+    function updatePendingList() {
+      const list = document.getElementById('pendingList');
+      const count = pendingRecords.length;
+      list.innerHTML = `
+        <div style="font-size: 16px; font-weight: 600; color: #6b7280; margin-bottom: 12px;">
+          待填写记录 (${count}条)
+        </div>
+        ${pendingRecords.map(r => `
+          <div class="pending-item">
+            <div class="pending-value">${r.value}</div>
+          </div>
+        `).join('')}
+      `;
+      document.getElementById('submitBtn').textContent = `填写${count}条`;
+    }
+    
+    // 启动摄像头
+    async function startCamera() {
+      try {
+        stream = await navigator.mediaDevices.getUserMedia({ 
+          video: { facingMode: 'environment' } 
+        });
+        const video = document.getElementById('video');
+        video.srcObject = stream;
+        document.getElementById('startScanBtn').classList.add('hidden');
+        scanning = true;
+        
+        // 开始扫码检测
+        detectBarcode();
+      } catch (error) {
+        showToast('需要相机权限才能扫码', 'duplicate');
+      }
+    }
+    
+    // 刷新摄像头
+    function refreshCamera() {
+      scanning = false;
+      if (stream) {
+        stream.getTracks().forEach(track => track.stop());
+      }
+      document.getElementById('startScanBtn').classList.remove('hidden');
+      setTimeout(() => {
+        startCamera();
+      }, 1500);
+    }
+    
+    // 检测条码（简化版）
+    async function detectBarcode() {
+      if (!scanning) return;
+      
+      const video = document.getElementById('video');
+      const canvas = document.createElement('canvas');
+      const ctx = canvas.getContext('2d');
+      
+      canvas.width = video.videoWidth;
+      canvas.height = video.videoHeight;
+      
+      // 这里需要集成条码检测库，暂时使用手动输入
+      // 实际项目中可以使用 zxing-js 或 quagga2
+    }
+    
+    // 处理扫码结果
+    async function handleBarcodeScanned(data) {
+      if (!data) return;
+      
+      // 去重检查
+      if (tableRecords.some(r => r.value === data)) {
+        playDuplicateSound();
+        showResult('duplicate', '已存在，已跳过', data, '该订单编号已登记，无需重复提交');
+        return;
+      }
+      
+      playSuccessSound();
+      
+      try {
+        const response = await fetch(`${API_BASE}/api/v1/feishu/scan`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ barcode: data })
+        });
+        const result = await response.json();
+        
+        if (result.success) {
+          showResult('success', '登记成功', data, '');
+          await loadTableRecords();
+          await loadStats();
+        } else {
+          showResult('failed', '登记失败', data, result.message || '未知错误');
+        }
+      } catch (error) {
+        showResult('failed', '登记失败', data, '网络错误');
+      }
+    }
+    
+    // 显示结果
+    function showResult(type, title, content, message) {
+      const card = document.getElementById('resultCard');
+      const icon = document.getElementById('resultIcon');
+      const titleEl = document.getElementById('resultTitle');
+      const contentEl = document.getElementById('resultContent');
+      const messageEl = document.getElementById('resultMessage');
+      
+      card.className = `result-card ${type}`;
+      card.classList.remove('hidden');
+      
+      icon.className = `result-icon ${type}`;
+      icon.textContent = type === 'success' ? '✓' : type === 'duplicate' ? '⚠' : '✕';
+      
+      titleEl.className = `result-title ${type}`;
+      titleEl.textContent = title;
+      
+      contentEl.textContent = content;
+      messageEl.textContent = message;
+    }
+    
+    // 播放音效
+    function playSuccessSound() {
+      successSound.currentTime = 0;
+      successSound.play().catch(() => {});
+    }
+    
+    function playDuplicateSound() {
+      duplicateSound.currentTime = 0;
+      duplicateSound.play().catch(() => {});
+    }
+    
+    // 显示 Toast
+    function showToast(message, type = 'success') {
+      const toast = document.getElementById('toast');
+      toast.className = `toast ${type}`;
+      toast.textContent = message;
+      toast.classList.remove('hidden');
+      
+      setTimeout(() => {
+        toast.classList.add('hidden');
+      }, 3000);
+    }
+    
+    // 批量填写 Modal
+    function openBatchModal() {
+      document.getElementById('batchModal').classList.remove('hidden');
+      loadPendingRecords();
+    }
+    
+    function closeBatchModal() {
+      document.getElementById('batchModal').classList.add('hidden');
+      document.getElementById('trackingInput').value = '';
+      document.getElementById('scanSuccessBanner').classList.add('hidden');
+    }
+    
+    // 批量扫码
+    function openBatchScanner() {
+      // 简化版：使用 prompt 输入
+      const code = prompt('请输入或扫描快递单号:');
+      if (code) {
+        document.getElementById('trackingInput').value = code;
+        showScanSuccess(code);
+      }
+    }
+    
+    function showScanSuccess(code) {
+      const banner = document.getElementById('scanSuccessBanner');
+      const text = document.getElementById('scanSuccessText');
+      text.textContent = `已识别：${code}`;
+      banner.classList.remove('hidden');
+      
+      setTimeout(() => {
+        banner.classList.add('hidden');
+      }, 2000);
+    }
+    
+    // 提交批量填写
+    async function submitBatch() {
+      const trackingNumber = document.getElementById('trackingInput').value.trim();
+      if (!trackingNumber) {
+        showToast('请输入快递单号', 'duplicate');
+        return;
+      }
+      
+      try {
+        const response = await fetch(`${API_BASE}/api/v1/feishu/batch-tracking`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ tracking_number: trackingNumber })
+        });
+        const result = await response.json();
+        
+        if (result.success) {
+          const count = result.updated || 0;
+          showToast(`成功填写 ${count} 条`, 'success');
+          closeBatchModal();
+          await loadStats();
+          await loadPendingRecords();
+        } else {
+          showToast(result.message || '填写失败', 'duplicate');
+        }
+      } catch (error) {
+        showToast('网络错误', 'duplicate');
+      }
+    }
+    
+    // 清空今日数据
+    async function clearToday() {
+      if (!confirm('确定要清空今日数据吗？')) return;
+      
+      try {
+        const response = await fetch(`${API_BASE}/api/v1/feishu/clear-today`, {
+          method: 'POST'
+        });
+        const result = await response.json();
+        
+        if (result.success) {
+          showToast('已清空今日数据', 'success');
+          await loadStats();
+        }
+      } catch (error) {
+        showToast('清空失败', 'duplicate');
+      }
+    }
+    
+    // 删除上一条
+    async function deleteLast() {
+      if (!confirm('确定要删除上一条记录吗？')) return;
+      
+      try {
+        const response = await fetch(`${API_BASE}/api/v1/feishu/delete-last`, {
+          method: 'POST'
+        });
+        const result = await response.json();
+        
+        if (result.success) {
+          showToast('已删除上一条', 'success');
+          await loadStats();
+        }
+      } catch (error) {
+        showToast('删除失败', 'duplicate');
+      }
+    }
+    
+    // 查看表格
+    function viewTable() {
+      window.open('https://feishu.cn', '_blank');
+    }
+    
+    // 初始化
+    init();
+  </script>
+</body>
+</html>
